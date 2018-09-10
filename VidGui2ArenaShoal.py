@@ -30,7 +30,7 @@ class settings(object):
     connections are closed properly.
     """
     def __init__(self, startFrame=0,
-                 endFrame=10):
+                 endFrame=10000):
         self.startFrame=startFrame
         self.endFrame=endFrame      
         self.currFrame=5000
@@ -42,19 +42,21 @@ class vidGui(object):
 
     #: Window to show results in
     window_name = "vidGUI"
-    def __init__(self, path,e1,e2,df):
+    def __init__(self, path,e1,df,ROIdf):
         self.settings=settings()
         self.df=df
+        self.ROIdf=ROIdf
         self.skipNan=121#e1.skipNanInd
         self.path = path
         self.cap = cv2.VideoCapture(path)
         self.im=[]
-        self.t1=e1.rawTra.values[:,0:2].copy()
-        self.t2=e2.rawTra.values[:,0:2].copy()
-        self.t1b=e1.rawTra.values[:,3:5].copy()
-        self.t2b=e2.rawTra.values[:,3:5].copy()
-        self.t1[:,0]=self.t1[:,0]+512        
-        self.t1b[:,0]=self.t1b[:,0]+512  
+        self.rawTra=e1.rawTra.values.copy()
+        #self.t1=e1.rawTra.values[:,0:2].copy()
+        #self.t2=e2.rawTra.values[:,0:2].copy()
+        #self.t1b=e1.rawTra.values[:,3:5].copy()
+        #self.t2b=e2.rawTra.values[:,3:5].copy()
+        #self.t1[:,0]=self.t1[:,0]+512        
+        #self.t1b[:,0]=self.t1b[:,0]+512  
         #vcv2.namedWindow(self.window_name)
         cv2.namedWindow(self.window_name,cv2.WINDOW_NORMAL)
         #cv2.namedWindow(self.window_name,cv2.WINDOW_AUTOSIZE)
@@ -139,59 +141,66 @@ class vidGui(object):
         #print(self.settings.currFrame,self.im.shape,self.im.min(),self.im.max(),r.shape)
         #DRAW path history
         #print(r.shape)
-        for f in r:
-            opacity=((fs-f)/float(tail))
-            center=tuple(self.t1b[f,:].astype('int'))
-            print(center)
-            cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,255), -1) 
-            center=tuple(self.t1[f,:].astype('int'))
-            cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,opacity*255), -1) 
-#             
-            center=tuple(self.t2[f,:].astype('int'))
-            cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,opacity*255), -1) 
-            center=tuple(self.t2b[f,:].astype('int'))
-            cv2.circle(self.im, center, pathDotSize, (255,opacity*255,opacity*255), -1)
+        
+        #loop over all arenas
+        
+        for ar in np.arange(ROIdf.shape[0]):
             
-#            
-#        #DRAW Current animal positions    
-        center=tuple(self.t1[f,:].astype('int'))
-        cv2.circle(self.im, center, 4, (0,0,0), -1)
-        if 'skype' in self.currEpi:
-            cv2.circle(self.im, center, 6, (255,opacity*255,opacity*255), 1)
-        center=tuple(self.t2[f,:].astype('int'))
-        cv2.circle(self.im, center, 4, (0,0,0), -1)
-        if 'skype' in self.currEpi:
-            cv2.circle(self.im, center, 6, (opacity*255,opacity*255,255), 1)
-#        
-#        
-#        #DRAW DISH BOUNDARIES
-        center=tuple((256,256))
-        cv2.circle(self.im, center, 240, (0,0,0), 2)
-        center=tuple((256+512,256))
-        cv2.circle(self.im, center, 240, (0,0,0), 2)
-        center=tuple((256+2*512,256))
-        cv2.circle(self.im, center, 240, (0,0,0), 2)
-        
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(self.im,self.currEpi,(450,20), font, 0.6,(0,0,0),2)  
-        
-        frInfo='Frame #: '+str(self.settings.currFrame)
-        cv2.putText(self.im,frInfo,(450,40), font, 0.4,(0,0,0),2)
-        
-        miliseconds=self.settings.currFrame*(100/3.0)
-        seconds,ms=divmod(miliseconds, 1000)
-        m, s = divmod(seconds, 60)
-        h, m = divmod(m, 60)
-        timeInfo= "%02d:%02d:%02d:%03d" % (h, m, s,ms)
-        cv2.putText(self.im,timeInfo,(450,60), font, 0.4,(0,0,0),2)
-        timeInfo2='(hh:mm:ss:ms)'
-        cv2.putText(self.im,timeInfo2,(450,80), font, 0.4,(0,0,0),2)
-
-        cv2.line(self.im, tuple((1024,0)), tuple((1024,512)), (0,0,0))        
-        
-        cv2.putText(self.im,"Arena 1",(220,60), font, 0.6,(0,0,0),2)
-        cv2.putText(self.im,"Arena 2",(220+512,60), font, 0.6,(0,0,0),2)
-        cv2.putText(self.im,"overlay 1 & 2",(200+1024,60), font, 0.6,(0,0,0),2)
+            pAn=self.rawTra[:,ar*3:ar*3+2]
+            
+            for f in r:
+                opacity=((fs-f)/float(tail))
+                center=tuple(self.t1b[f,:].astype('int'))
+                print(center)
+                cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,255), -1) 
+                center=tuple(self.t1[f,:].astype('int'))
+                cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,opacity*255), -1) 
+    #             
+                center=tuple(self.t2[f,:].astype('int'))
+                cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,opacity*255), -1) 
+                center=tuple(self.t2b[f,:].astype('int'))
+                cv2.circle(self.im, center, pathDotSize, (255,opacity*255,opacity*255), -1)
+                
+    #            
+    #        #DRAW Current animal positions    
+            center=tuple(self.t1[f,:].astype('int'))
+            cv2.circle(self.im, center, 4, (0,0,0), -1)
+            if 'skype' in self.currEpi:
+                cv2.circle(self.im, center, 6, (255,opacity*255,opacity*255), 1)
+            center=tuple(self.t2[f,:].astype('int'))
+            cv2.circle(self.im, center, 4, (0,0,0), -1)
+            if 'skype' in self.currEpi:
+                cv2.circle(self.im, center, 6, (opacity*255,opacity*255,255), 1)
+    #        
+    #        
+    #        #DRAW DISH BOUNDARIES
+            center=tuple((256,256))
+            cv2.circle(self.im, center, 240, (0,0,0), 2)
+            center=tuple((256+512,256))
+            cv2.circle(self.im, center, 240, (0,0,0), 2)
+            center=tuple((256+2*512,256))
+            cv2.circle(self.im, center, 240, (0,0,0), 2)
+            
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(self.im,self.currEpi,(450,20), font, 0.6,(0,0,0),2)  
+            
+            frInfo='Frame #: '+str(self.settings.currFrame)
+            cv2.putText(self.im,frInfo,(450,40), font, 0.4,(0,0,0),2)
+            
+            miliseconds=self.settings.currFrame*(100/3.0)
+            seconds,ms=divmod(miliseconds, 1000)
+            m, s = divmod(seconds, 60)
+            h, m = divmod(m, 60)
+            timeInfo= "%02d:%02d:%02d:%03d" % (h, m, s,ms)
+            cv2.putText(self.im,timeInfo,(450,60), font, 0.4,(0,0,0),2)
+            timeInfo2='(hh:mm:ss:ms)'
+            cv2.putText(self.im,timeInfo2,(450,80), font, 0.4,(0,0,0),2)
+    
+            cv2.line(self.im, tuple((1024,0)), tuple((1024,512)), (0,0,0))        
+            
+            cv2.putText(self.im,"Arena 1",(220,60), font, 0.6,(0,0,0),2)
+            cv2.putText(self.im,"Arena 2",(220+512,60), font, 0.6,(0,0,0),2)
+            cv2.putText(self.im,"overlay 1 & 2",(200+1024,60), font, 0.6,(0,0,0),2)
         
         cv2.imshow(self.window_name, self.im)
         #print(f,self.im.shape,self.im.max())
@@ -204,17 +213,22 @@ class vidGui(object):
         
 p='D:\\data\\b\\2017\\20170131_VR_skypeVsTrefoil\\01_skypeVsTrefoil_blackDisk002\\'
 p='C:\\Users\\johannes\\Dropbox\\20170131_VR_skypeVsTrefoil_01\\'
+p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'
 
 rereadTxt=0
+
+#avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
+avi_path=p+'out_id0_30fps_20170710124615.avi'
+p, tail = os.path.split(avi_path)
+tp=glob.glob(p+'\\Position*.txt')
+    
 if rereadTxt:
-    #avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
-    avi_path=p+'out_id0_30fps_20170131090314.avi'
-    p, tail = os.path.split(avi_path)
-    tp=glob.glob(p+'\\Position*.txt')
     e1=xp.experiment(tp[0])
-    e2=xp.experiment(tp[1])    
     
-csvFileOut=tp[0][:-4]+'_siSummary_epi'+str(10.0)+'.csv'
-df=pd.read_csv(csvFileOut,index_col=0,sep=',')[['epStart','episode']]
-    
-a=vidGui(avi_path,e1,e2,df)
+    csvFileOut=tp[0][:-4]+'_siSummary_epi'+str(5.0)+'.csv'
+    ROIfn=glob.glob(p+'\\ROI*')[0]
+    PLfn=glob.glob(p+'\\PL_*')[0]
+    df=pd.read_csv(csvFileOut,index_col=0,sep=',')[['epStart','episode']]
+    ROIdf=pd.read_csv(ROIfn,index_col=None,sep=' ',header=None)
+    PLdf=pd.read_csv(PLfn,index_col=None,sep=' ',header=None)
+    a=vidGui(avi_path,e1,df,ROIdf)
