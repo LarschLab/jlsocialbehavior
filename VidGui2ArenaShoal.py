@@ -39,18 +39,10 @@ class settings(object):
         self.haveVid=False
 
 class vidGui(object):
-    """
-    A class for tuning Stereo BM settings.
- 
-    Display a normalized disparity picture from two pictures captured with a
-    ``CalibratedPair`` and allow the user to manually tune the settings for the
-    stereo block matcher.
-    """
+
     #: Window to show results in
     window_name = "vidGUI"
     def __init__(self, path,e1,e2,df):
-        """Initialize tuner with a ``CalibratedPair`` and tune given pair."""
-        #: Calibrated stereo pair to find Stereo BM settings for
         self.settings=settings()
         self.df=df
         self.skipNan=121#e1.skipNanInd
@@ -59,12 +51,14 @@ class vidGui(object):
         self.im=[]
         self.t1=e1.rawTra.values[:,0:2].copy()
         self.t2=e2.rawTra.values[:,0:2].copy()
-        self.t1b=e1.rawTra.values[:,2:3].copy()
-        self.t2b=e2.rawTra.values[:,2:3].copy()
+        self.t1b=e1.rawTra.values[:,3:5].copy()
+        self.t2b=e2.rawTra.values[:,3:5].copy()
         self.t1[:,0]=self.t1[:,0]+512        
         self.t1b[:,0]=self.t1b[:,0]+512  
         #vcv2.namedWindow(self.window_name)
         cv2.namedWindow(self.window_name,cv2.WINDOW_NORMAL)
+        #cv2.namedWindow(self.window_name,cv2.WINDOW_AUTOSIZE)
+
         cv2.setMouseCallback(self.window_name, self.startStop)
         cv2.createTrackbar("startFrame", self.window_name,
                            self.settings.startFrame, 1000,
@@ -85,6 +79,11 @@ class vidGui(object):
                 
             
                 key = cv2.waitKey(50) & 0xFF
+                
+                if key == ord("x"):
+                    if self.settings.haveVid:
+                        self.vOut.release()
+                    cv2.destroyAllWindows()
                  
                 if key == ord("v"):
                   
@@ -127,7 +126,7 @@ class vidGui(object):
     def updateFrame(self):
         
          
-        tail=500
+        tail=100
         tailStep=5.0
         pathDotSize=1
         
@@ -136,23 +135,25 @@ class vidGui(object):
         fs= self.settings.currFrame-np.mod(self.settings.currFrame,5)
         self.currEpi=self.df['episode'].ix[np.where(self.df['epStart']>fs)[0][0]-1][1:]
         r=np.arange(fs-tail,fs,tailStep).astype('int')
-        
+        #cv2.imshow(self.window_name, self.im)
+        #print(self.settings.currFrame,self.im.shape,self.im.min(),self.im.max(),r.shape)
         #DRAW path history
+        #print(r.shape)
         for f in r:
             opacity=((fs-f)/float(tail))
-            
             center=tuple(self.t1b[f,:].astype('int'))
+            print(center)
             cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,255), -1) 
             center=tuple(self.t1[f,:].astype('int'))
             cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,opacity*255), -1) 
-             
+#             
             center=tuple(self.t2[f,:].astype('int'))
             cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,opacity*255), -1) 
             center=tuple(self.t2b[f,:].astype('int'))
             cv2.circle(self.im, center, pathDotSize, (255,opacity*255,opacity*255), -1)
             
-            
-        #DRAW Current animal positions    
+#            
+#        #DRAW Current animal positions    
         center=tuple(self.t1[f,:].astype('int'))
         cv2.circle(self.im, center, 4, (0,0,0), -1)
         if 'skype' in self.currEpi:
@@ -161,9 +162,9 @@ class vidGui(object):
         cv2.circle(self.im, center, 4, (0,0,0), -1)
         if 'skype' in self.currEpi:
             cv2.circle(self.im, center, 6, (opacity*255,opacity*255,255), 1)
-        
-        
-        #DRAW DISH BOUNDARIES
+#        
+#        
+#        #DRAW DISH BOUNDARIES
         center=tuple((256,256))
         cv2.circle(self.im, center, 240, (0,0,0), 2)
         center=tuple((256+512,256))
@@ -193,6 +194,7 @@ class vidGui(object):
         cv2.putText(self.im,"overlay 1 & 2",(200+1024,60), font, 0.6,(0,0,0),2)
         
         cv2.imshow(self.window_name, self.im)
+        #print(f,self.im.shape,self.im.max())
         if self.settings.vidRec:
            
             wr=self.im.astype('uint8')
@@ -201,9 +203,9 @@ class vidGui(object):
 
         
 p='D:\\data\\b\\2017\\20170131_VR_skypeVsTrefoil\\01_skypeVsTrefoil_blackDisk002\\'
- 
+p='C:\\Users\\johannes\\Dropbox\\20170131_VR_skypeVsTrefoil_01\\'
 
-rereadTxt=1
+rereadTxt=0
 if rereadTxt:
     #avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
     avi_path=p+'out_id0_30fps_20170131090314.avi'
