@@ -13,7 +13,6 @@ Created on Fri Feb 10 10:55:23 2017
 """
 
 import cv2
-#from tkinter import filedialog
 import os
 import matplotlib.pyplot as plt
 import models.experiment as xp
@@ -21,55 +20,58 @@ import glob
 import numpy as np
 import pandas as pd
 import datetime
+import functions.CameraInterceptCorrection as cic
 
 class settings(object):
-    """
-    A stereo pair of calibrated cameras.
- 
-    Should be initialized with a context manager to ensure that the camera
-    connections are closed properly.
-    """
+
     def __init__(self, startFrame=0,
-                 endFrame=10000):
+                 endFrame=108000):
         self.startFrame=startFrame
         self.endFrame=endFrame      
-        self.currFrame=5000
+        self.currFrame=82800
         self.run=False
         self.vidRec=False
         self.haveVid=False
+        self.drawStim=True
+        self.drawAn=False
+        self.drawStimPath=True
+        self.drawAnPath=True
+        self.drawAnSize=8
+        self.drawStimSize=8
+        self.drawAnPathSize=2
+        self.drawStimPathSize=2
+        self.drawArenas=False
+        self.drawTime=True
+        self.drawAnCol=(0,0,0)
+        self.drawStimCol=(0,0,1)
+        self.drawTailLen=200
+        self.drawTailStep=10.0
+        self.drawVideoFrame=True
 
 class vidGui(object):
 
-    #: Window to show results in
     window_name = "vidGUI"
-    def __init__(self, path,e1,df,ROIdf):
+    def __init__(self, path,e1,df,ROIdf,PLdf):
         self.settings=settings()
         self.df=df
+        self.PLdf=PLdf
         self.ROIdf=ROIdf
         self.skipNan=121#e1.skipNanInd
         self.path = path
         self.cap = cv2.VideoCapture(path)
         self.im=[]
         self.rawTra=e1.rawTra.values.copy()
-        #self.t1=e1.rawTra.values[:,0:2].copy()
-        #self.t2=e2.rawTra.values[:,0:2].copy()
-        #self.t1b=e1.rawTra.values[:,3:5].copy()
-        #self.t2b=e2.rawTra.values[:,3:5].copy()
-        #self.t1[:,0]=self.t1[:,0]+512        
-        #self.t1b[:,0]=self.t1b[:,0]+512  
-        #vcv2.namedWindow(self.window_name)
         cv2.namedWindow(self.window_name,cv2.WINDOW_NORMAL)
-        #cv2.namedWindow(self.window_name,cv2.WINDOW_AUTOSIZE)
 
         cv2.setMouseCallback(self.window_name, self.startStop)
         cv2.createTrackbar("startFrame", self.window_name,
-                           self.settings.startFrame, 1000,
+                           self.settings.startFrame, 108000,
                            self.set_startFrame)
         cv2.createTrackbar("endFrame", self.window_name,
-                           self.settings.endFrame, 50000,
+                           self.settings.endFrame, 108000,
                            self.set_endFrame)
         cv2.createTrackbar("currFrame", self.window_name,
-                           self.settings.currFrame, 10000,
+                           self.settings.currFrame, 108000,
                            self.set_currFrame)
     
     def startStop(self,event, x, y, flags, param):
@@ -78,10 +80,8 @@ class vidGui(object):
             while self.settings.run:
                 f=self.settings.currFrame
                 f+=1
-                
+                key = cv2.waitKey(500) & 0xFF
             
-                key = cv2.waitKey(50) & 0xFF
-                
                 if key == ord("x"):
                     if self.settings.haveVid:
                         self.vOut.release()
@@ -128,82 +128,91 @@ class vidGui(object):
     def updateFrame(self):
         
          
-        tail=100
-        tailStep=5.0
-        pathDotSize=1
+
+        
+        xMax=2048.0 
         
         self.cap.set(cv2.CAP_PROP_POS_FRAMES,self.settings.currFrame)
         self.im=255-self.cap.read()[1]
+        if self.settings.drawVideoFrame:
+            mi=150
+            ma=250
+            self.im=((self.im - mi)/(ma - mi))*255
+            self.im[self.im>255]=255
+            self.im[self.im<0]=0
+        else:
+            self.im[:]=255
+        self.im=self.im.astype('uint8')
         fs= self.settings.currFrame-np.mod(self.settings.currFrame,5)
         self.currEpi=self.df['episode'].ix[np.where(self.df['epStart']>fs)[0][0]-1][1:]
-        r=np.arange(fs-tail,fs,tailStep).astype('int')
-        #cv2.imshow(self.window_name, self.im)
-        #print(self.settings.currFrame,self.im.shape,self.im.min(),self.im.max(),r.shape)
-        #DRAW path history
-        #print(r.shape)
+        r=np.arange(fs-self.settings.drawTailLen,fs,self.settings.drawTailStep).astype('int')
         
+        #DRAW path history
         #loop over all arenas
         
         for ar in np.arange(ROIdf.shape[0]):
             
-            pAn=self.rawTra[:,ar*3:ar*3+2]
+            offset=self.ROIdf.values[ar]
+            #print(ar,offset)
+            pAn=self.rawTra[:,ar*3:ar*3+2].copy()
+            xoff=offset[0]
+            yoff=offset[1]
+            xx,yy=cic.deCorrectFish(pAn[:,0],pAn[:,1],xoff,yoff,xMax,53.)
+            pAn[:,0]=xx+xoff
+            pAn[:,1]=yy+yoff
             
+            stimAn=np.where(PLdf.values[:,ar])[0][0]
+            pSt=self.rawTra[:,stimAn*3:stimAn*3+2]+offset[:2]
+            
+            # draw path history 
             for f in r:
-                opacity=((fs-f)/float(tail))
-                center=tuple(self.t1b[f,:].astype('int'))
-                print(center)
-                cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,255), -1) 
-                center=tuple(self.t1[f,:].astype('int'))
-                cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,opacity*255), -1) 
-    #             
-                center=tuple(self.t2[f,:].astype('int'))
-                cv2.circle(self.im, center, pathDotSize, (opacity*255,opacity*255,opacity*255), -1) 
-                center=tuple(self.t2b[f,:].astype('int'))
-                cv2.circle(self.im, center, pathDotSize, (255,opacity*255,opacity*255), -1)
-                
+                opacity=250*((fs-f)/float(self.settings.drawTailLen))
+                if self.settings.drawStimPath:
+                    center=tuple(pSt[f,:].astype('int'))
+                    #print('before')
+                    c=tuple(np.array([opacity if x==0 else 250. for x in self.settings.drawStimCol]))
+                    #print(center,  self.settings.drawStimPathSize, c,self.settings.drawStimCol)
+                    cv2.circle(self.im, center,  self.settings.drawStimPathSize, c, -1) 
+                    #print('drawn')
+                if self.settings.drawAnPath:
+                    center=tuple(pAn[f,:].astype('int'))
+                    c=tuple(np.array([opacity if x==0 else 250. for x in self.settings.drawAnCol]))
+                    cv2.circle(self.im, center,  self.settings.drawAnPathSize, c, -1) 
+                    #print('drawn2')
     #            
-    #        #DRAW Current animal positions    
-            center=tuple(self.t1[f,:].astype('int'))
-            cv2.circle(self.im, center, 4, (0,0,0), -1)
-            if 'skype' in self.currEpi:
-                cv2.circle(self.im, center, 6, (255,opacity*255,opacity*255), 1)
-            center=tuple(self.t2[f,:].astype('int'))
-            cv2.circle(self.im, center, 4, (0,0,0), -1)
-            if 'skype' in self.currEpi:
-                cv2.circle(self.im, center, 6, (opacity*255,opacity*255,255), 1)
-    #        
-    #        
+    #        #DRAW Current stimulus position
+            if self.settings.drawStim:
+                
+                center=tuple(pSt[f,:].astype('int'))
+                cv2.circle(self.im, center, self.settings.drawStimSize, self.settings.drawStimCol, -1)
+            if self.settings.drawAn:
+                center=tuple(pAn[f,:].astype('int'))
+                cv2.circle(self.im, center, self.settings.drawAnSize, self.settings.drawAnCol, -1)            
+
     #        #DRAW DISH BOUNDARIES
-            center=tuple((256,256))
-            cv2.circle(self.im, center, 240, (0,0,0), 2)
-            center=tuple((256+512,256))
-            cv2.circle(self.im, center, 240, (0,0,0), 2)
-            center=tuple((256+2*512,256))
-            cv2.circle(self.im, center, 240, (0,0,0), 2)
-            
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(self.im,self.currEpi,(450,20), font, 0.6,(0,0,0),2)  
-            
-            frInfo='Frame #: '+str(self.settings.currFrame)
-            cv2.putText(self.im,frInfo,(450,40), font, 0.4,(0,0,0),2)
-            
-            miliseconds=self.settings.currFrame*(100/3.0)
-            seconds,ms=divmod(miliseconds, 1000)
-            m, s = divmod(seconds, 60)
-            h, m = divmod(m, 60)
-            timeInfo= "%02d:%02d:%02d:%03d" % (h, m, s,ms)
-            cv2.putText(self.im,timeInfo,(450,60), font, 0.4,(0,0,0),2)
-            timeInfo2='(hh:mm:ss:ms)'
-            cv2.putText(self.im,timeInfo2,(450,80), font, 0.4,(0,0,0),2)
+            if self.settings.drawArenas:
+                center=tuple(offset[3:5])
+                cv2.circle(self.im, center, offset[-1], (0,0,0), 2)
+
+            if self.settings.drawTime:
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                cv2.putText(self.im,self.currEpi,(380,20), font, 0.6,(0,0,0),2)  
+                
+                frInfo='Frame #: '+str(self.settings.currFrame)
+                cv2.putText(self.im,frInfo,(380,40), font, 0.4,(0,0,0),2)
+                
+                miliseconds=self.settings.currFrame*(100/3.0)
+                seconds,ms=divmod(miliseconds, 1000)
+                m, s = divmod(seconds, 60)
+                h, m = divmod(m, 60)
+                timeInfo= "%02d:%02d:%02d:%03d" % (h, m, s,ms)
+                cv2.putText(self.im,timeInfo,(380,60), font, 0.4,(0,0,0),2)
+                timeInfo2='(hh:mm:ss:ms)'
+                cv2.putText(self.im,timeInfo2,(380,80), font, 0.4,(0,0,0),2)
     
-            cv2.line(self.im, tuple((1024,0)), tuple((1024,512)), (0,0,0))        
-            
-            cv2.putText(self.im,"Arena 1",(220,60), font, 0.6,(0,0,0),2)
-            cv2.putText(self.im,"Arena 2",(220+512,60), font, 0.6,(0,0,0),2)
-            cv2.putText(self.im,"overlay 1 & 2",(200+1024,60), font, 0.6,(0,0,0),2)
+
         
         cv2.imshow(self.window_name, self.im)
-        #print(f,self.im.shape,self.im.max())
         if self.settings.vidRec:
            
             wr=self.im.astype('uint8')
@@ -215,7 +224,7 @@ p='D:\\data\\b\\2017\\20170131_VR_skypeVsTrefoil\\01_skypeVsTrefoil_blackDisk002
 p='C:\\Users\\johannes\\Dropbox\\20170131_VR_skypeVsTrefoil_01\\'
 p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'
 
-rereadTxt=0
+rereadTxt=1
 
 #avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
 avi_path=p+'out_id0_30fps_20170710124615.avi'
@@ -225,10 +234,10 @@ tp=glob.glob(p+'\\Position*.txt')
 if rereadTxt:
     e1=xp.experiment(tp[0])
     
-    csvFileOut=tp[0][:-4]+'_siSummary_epi'+str(5.0)+'.csv'
-    ROIfn=glob.glob(p+'\\ROI*')[0]
-    PLfn=glob.glob(p+'\\PL_*')[0]
-    df=pd.read_csv(csvFileOut,index_col=0,sep=',')[['epStart','episode']]
-    ROIdf=pd.read_csv(ROIfn,index_col=None,sep=' ',header=None)
-    PLdf=pd.read_csv(PLfn,index_col=None,sep=' ',header=None)
-    a=vidGui(avi_path,e1,df,ROIdf)
+csvFileOut=glob.glob(tp[0][:-4]+'_siSummary_epi*.csv')[0]
+ROIfn=glob.glob(p+'\\ROI*')[0]
+PLfn=glob.glob(p+'\\PL_*')[0]
+df=pd.read_csv(csvFileOut,index_col=0,sep=',')[['epStart','episode']]
+ROIdf=pd.read_csv(ROIfn,index_col=None,sep=' ',header=None)
+PLdf=pd.read_csv(PLfn,index_col=None,sep=' ',header=None)
+a=vidGui(avi_path,e1,df,ROIdf,PLdf)
