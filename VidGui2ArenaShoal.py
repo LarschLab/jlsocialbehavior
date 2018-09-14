@@ -25,10 +25,10 @@ import functions.CameraInterceptCorrection as cic
 class settings(object):
 
     def __init__(self, startFrame=0,
-                 endFrame=108000):
+                 endFrame=225000+600):
         self.startFrame=startFrame
         self.endFrame=endFrame      
-        self.currFrame=82800
+        self.currFrame=225000-300
         self.run=False
         self.vidRec=False
         self.haveVid=False
@@ -40,13 +40,14 @@ class settings(object):
         self.drawStimSize=8
         self.drawAnPathSize=2
         self.drawStimPathSize=2
-        self.drawArenas=False
+        self.drawArenas=True
         self.drawTime=True
         self.drawAnCol=(0,0,0)
         self.drawStimCol=(0,0,1)
         self.drawTailLen=200
         self.drawTailStep=10.0
         self.drawVideoFrame=True
+        self.PLcode=True
 
 class vidGui(object):
 
@@ -65,13 +66,13 @@ class vidGui(object):
 
         cv2.setMouseCallback(self.window_name, self.startStop)
         cv2.createTrackbar("startFrame", self.window_name,
-                           self.settings.startFrame, 108000,
+                           self.settings.startFrame, 225000+600,
                            self.set_startFrame)
         cv2.createTrackbar("endFrame", self.window_name,
-                           self.settings.endFrame, 108000,
+                           self.settings.endFrame, 225000+600,
                            self.set_endFrame)
         cv2.createTrackbar("currFrame", self.window_name,
-                           self.settings.currFrame, 108000,
+                           self.settings.currFrame, 225000+600,
                            self.set_currFrame)
     
     def startStop(self,event, x, y, flags, param):
@@ -144,7 +145,7 @@ class vidGui(object):
             self.im[:]=255
         self.im=self.im.astype('uint8')
         fs= self.settings.currFrame-np.mod(self.settings.currFrame,5)
-        self.currEpi=self.df['episode'].ix[np.where(self.df['epStart']>fs)[0][0]-1][1:]
+        self.currEpi=self.df['episode'].ix[np.where(self.df['epStart']>fs)[0][0]-1]
         r=np.arange(fs-self.settings.drawTailLen,fs,self.settings.drawTailStep).astype('int')
         
         #DRAW path history
@@ -161,7 +162,10 @@ class vidGui(object):
             pAn[:,0]=xx+xoff
             pAn[:,1]=yy+yoff
             
-            stimAn=np.where(PLdf.values[:,ar])[0][0]
+            if self.settings.PLcode:
+                pairListNr = int(self.currEpi[:2])
+                pairList = PLdf.values[pairListNr * 16:(pairListNr + 1) * 16, ar]
+            stimAn=np.where(pairList)[0][0]
             pSt=self.rawTra[:,stimAn*3:stimAn*3+2]+offset[:2]
             
             # draw path history 
@@ -220,14 +224,17 @@ class vidGui(object):
             self.vOut.write(wr)
 
         
-p='D:\\data\\b\\2017\\20170131_VR_skypeVsTrefoil\\01_skypeVsTrefoil_blackDisk002\\'
-p='C:\\Users\\johannes\\Dropbox\\20170131_VR_skypeVsTrefoil_01\\'
-p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'
+#p='D:\\data\\b\\2017\\20170131_VR_skypeVsTrefoil\\01_skypeVsTrefoil_blackDisk002\\'
+#p='C:\\Users\\johannes\\Dropbox\\20170131_VR_skypeVsTrefoil_01\\'
+#p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'; avi_path=p+'out_id0_30fps_20170710124615.avi' #frame: 82800
+p='D:\\data\\b\\2017\\20170921_SkypePairPermutations\\'; avi_path=p+'out_id0_30fps_20170921120214.avi'#frame 53700
+#avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
+
+
 
 rereadTxt=1
 
-#avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
-avi_path=p+'out_id0_30fps_20170710124615.avi'
+
 p, tail = os.path.split(avi_path)
 tp=glob.glob(p+'\\Position*.txt')
     
