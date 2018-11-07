@@ -123,6 +123,12 @@ class Pair(object):
         a2 = np.nanmean(self.animals[1].ts.speed())
         return np.array([a1, a2])
 
+    def a1SpeedTrace_smooth(self):
+        return np.array(self.animals[0].ts.speed_smooth())
+
+    def a1SpeedTrace(self):
+        return np.array(self.animals[0].ts.speed())
+
     def avgSpeed_smooth(self):
         a1 = np.nanmean(self.animals[0].ts.speed_smooth())
         a2 = np.nanmean(self.animals[1].ts.speed_smooth())
