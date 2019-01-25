@@ -30,22 +30,26 @@ class AnimalTimeSeriesCollection:
     def __init__(self):
         self.animalIndex = None
         self.mapBins = np.arange(-31, 32)
+        self.pxPmm = None
+        self.fps = None
     
     # Call this function from an animal class to link it with this class
     def linkAnimal(self, animal):
         self.animal = animal
         self.ID = animal.ID
-        self.animalIndex = self.animal.pair.animalIDs[self.ID]
+        if self.animal.paired:
+            self.animalIndex = self.animal.pair.animalIDs[self.ID]
+            self.pxPmm = self.animal.pair.experiment.expInfo.pxPmm
+            self.fps = self.animal.pair.experiment.expInfo.fps
+        else:
+            self.animalIndex = self.ID
+            self.pxPmm = self.animal.experiment.expInfo.pxPmm
+            self.fps = self.animal.experiment.expInfo.fps
         animal.add_TimeSeriesCollection(self)
     
     # function to shift fundamental time series upon loading to generate control data
     def timeShift(self, x):
         return np.roll(x, self.animal.pair.shift[self.animal.ID], axis=0)
-        #if self.animal.ID==0:
-        #    print('shifting by: ', self.animal.pair.shift)
-        #    return np.roll(x, self.animal.pair.shift, axis=0)
-        #else:
-        #    return np.roll(x, 0, axis=0)
 
 # --------------------------
 # fundamental time series
@@ -54,17 +58,21 @@ class AnimalTimeSeriesCollection:
 
     def rawTra(self):
         a = self.animalIndex
-        rng = self.animal.pair.rng
         currCols = [a * 3, a * 3 + 1]
-        x = self.animal.pair.experiment.rawTra.iloc[rng[0]:rng[1], currCols]
-        return Trajectory(self.timeShift(x))
+        if self.animal.paired:
+            rng = self.animal.pair.rng
+            x = self.animal.pair.experiment.rawTra.iloc[rng[0]:rng[1], currCols]
+            return Trajectory(self.timeShift(x))
+        else:
+            x = self.animal.experiment.rawTra.iloc[:, currCols]
+            return Trajectory(np.roll(x, 0, axis=0))
 
-    def trackedHeading(self):
-        a = self.animalIndex
-        rng = self.animal.pair.rng
-        currCols = [a * 3 + 2]
-        x = self.animal.pair.experiment.rawTra.iloc[rng[0]:rng[1], currCols]
-        return self.timeShift(x)
+    # def trackedHeading(self):
+    #     a = self.animalIndex
+    #     rng = self.animal.pair.rng
+    #     currCols = [a * 3 + 2]
+    #     x = self.animal.pair.experiment.rawTra.iloc[rng[0]:rng[1], currCols]
+    #     return self.timeShift(x)
         
 # --------------------------
 # derived time series
@@ -75,8 +83,7 @@ class AnimalTimeSeriesCollection:
         # currCenterPx = self.animal.pair.experiment.expInfo.rois[self.animalIndex, -1] + 2
         currCenterPx = 0
         arenaCenterPx = np.array([currCenterPx, currCenterPx])
-        pxPmm = self.animal.pair.experiment.expInfo.pxPmm
-        x = (self.rawTra().xy-arenaCenterPx) / pxPmm
+        x = (self.rawTra().xy-arenaCenterPx) / self.pxPmm
         return Trajectory(x)
         
     def position_smooth(self):
@@ -109,12 +116,10 @@ class AnimalTimeSeriesCollection:
         return x
         
     def speed(self):
-        fps = self.animal.pair.experiment.expInfo.fps
-        return self.travel() * fps
+        return self.travel() * self.fps
     
     def speed_smooth(self):
-        fps = self.animal.pair.experiment.expInfo.fps
-        return self.travel_smooth() * fps
+        return self.travel_smooth() * self.fps
     
     def totalTravel(self):
         return np.nansum(np.abs(self.travel()))

@@ -14,11 +14,19 @@ class Animal(object):
         self.ID = ID
         self.pair = []
         self.ts = []
+        self.paired = True
         self.neighbor = None
+        self.experiment = None
 
-    def joinPair(self, pair):
+    def joinPair(self, pair):  # use to add episode data into a pair.
         self.pair = pair
         pair.addAnimal(self)
+
+    def joinExperiment(self, experiment):  # use to add all data to experiment.
+        self.experiment = experiment
+        experiment.addAnimal(self)
+        self.paired = False
+        self.wakeUp()
 
     def add_TimeSeriesCollection(self, ts):
         self.ts = ts
@@ -30,6 +38,7 @@ class Animal(object):
 
     def wakeUp(self):
         AnimalTimeSeriesCollection().linkAnimal(self)
-        self.neighbor = self.pair.animals[1-self.ID]
+        if self.paired:
+            self.neighbor = self.pair.animals[1-self.ID]
 
 

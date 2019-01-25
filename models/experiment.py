@@ -6,6 +6,7 @@ import functions.plotFunctions_joh as johPlt
 import functions.randomDotsOnCircle as randSpacing
 import functions.video_functions as vf
 from models.pair import Pair
+from models.animal import Animal
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -324,6 +325,7 @@ class experiment(object):
         self.episodeAll = None  # time series of episode name
         self.anSize = None      # np array of animal size
         self.pair = []          # place holder for animal-pair-episodes
+        self.animals = []
         self.shiftList = None   # fix list for 'random' shifts for time shift control data.
 
         # imitate overload behavior
@@ -346,11 +348,16 @@ class experiment(object):
             #shiftB=shiftA+self.expInfo.minShift
 
             shiftMid=int(0.5*self.expInfo.episodeDur*self.expInfo.fps*60)
-            shiftA= np.linspace(self.expInfo.minShift,shiftMid,self.expInfo.nShiftRuns).astype('int')
-            shiftB = np.linspace(shiftMid+self.expInfo.minShift,2*shiftMid-self.expInfo.minShift,self.expInfo.nShiftRuns).astype('int')[::-1]
+            shiftA= np.linspace(self.expInfo.minShift,
+                                shiftMid,
+                                self.expInfo.nShiftRuns).astype('int')
+            shiftB = np.linspace(shiftMid+self.expInfo.minShift,
+                                 2*shiftMid-self.expInfo.minShift,
+                                 self.expInfo.nShiftRuns).astype('int')[::-1]
 
 
             self.shiftList = np.array([shiftA, shiftB])
+            self.linkFullAnimals()
             self.splitToPairs()                                 # Split raw data table into animal-pair-episodes
             self.saveExpData()                                  # compute and collect pair statistics
 
@@ -365,6 +372,10 @@ class experiment(object):
         else:
             print('Wrong experiment definition argument. Provide TxtPath or pd.Series')
             raise FileNotFoundError
+
+    def linkFullAnimals(self):
+        for i in range(self.expInfo.numPairs):
+            Animal(ID=i).joinExperiment(self)
 
     def splitToPairs(self):
         # Split raw data table into animal-pair-episodes
@@ -419,7 +430,7 @@ class experiment(object):
 
                 for mp in range(currPartnerAll.shape[0]):
                     currPartner = currPartnerAll[mp]
-                    Pair(shift=0, animalIDs=[p, currPartner], epiNr=i, rng=rng).linkExperiment(self)
+                    Pair(shift=0, animalIDs=[p, currPartner], epiNr=i, rng=rng).joinExperiment(self)
 
     def saveExpData(self):
 
@@ -663,11 +674,13 @@ class experiment(object):
                 anSize = np.loadtxt(self.expInfo.anSizeFile)
         return anSize
 
-
-    def addPair(self,pair):
-
+    def addPair(self, pair):
         self.pair.append(pair)
         return self.pair[-1]
+
+    def addAnimal(self, animal):
+        self.animals.append(animal)
+        return self.animals[-1]
       
     def load_animalShapeParameters(self):
         

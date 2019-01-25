@@ -29,16 +29,12 @@ class Pair(object):
         self.animals.append(animal)
         return self.animals[animal.ID]
 
-    def linkExperiment(self, experiment):
+    def joinExperiment(self, experiment):
         self.experiment = experiment
         experiment.addPair(self)
 
-        fps = self.experiment.expInfo.fps
-        episodeDur = self.experiment.expInfo.episodeDur  # expected in minutes
-        episodeFrames = fps * episodeDur * 60
-
         for i in range(2):
-            Animal(i).joinPair(self)
+            Animal(ID=i).joinPair(self)
 
         for i in range(2):
             self.animals[i].wakeUp()
