@@ -81,7 +81,7 @@ class AnimalTimeSeriesCollection:
         
     def position_smooth(self):
         x = self.position().xy
-        return Trajectory(mu.smooth(x, window_len=5, window='hamming'))
+        return Trajectory(mu.smooth(x, window_len=5, window='hamming')[:9000, :])
         
     def positionPol(self):
         x = [mu.cart2pol(*self.position().xy.T)]
