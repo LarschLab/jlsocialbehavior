@@ -325,6 +325,7 @@ class experiment(object):
         self.episodeAll = None  # time series of episode name
         self.anSize = None      # np array of animal size
         self.pair = []          # place holder for animal-pair-episodes
+        self.pair_f = []
         self.animals = []
         self.shiftList = None   # fix list for 'random' shifts for time shift control data.
 
@@ -358,6 +359,7 @@ class experiment(object):
 
             self.shiftList = np.array([shiftA, shiftB])
             self.linkFullAnimals()
+            self.linkFullPairs()
             self.splitToPairs()                                 # Split raw data table into animal-pair-episodes
             self.saveExpData()                                  # compute and collect pair statistics
 
@@ -374,8 +376,27 @@ class experiment(object):
             raise FileNotFoundError
 
     def linkFullAnimals(self):
-        for i in range(self.expInfo.numPairs):
+        for i in range(self.expInfo.numPairs+1):# adding extra 'animal' which is stimulus!
             Animal(ID=i).joinExperiment(self)
+
+    def linkFullPairs(self):#  add full traces as one long episode for easy access
+
+        if self.expInfo.episodePLcode:
+            print('PL code used, omitting FullPairs.')
+        else:
+            pairList = self.expInfo.pairListAll
+
+        for p in range(self.expInfo.numPairs):
+
+            currPartnerAll = np.where(pairList[:, p])[0]
+
+            for mp in range(currPartnerAll.shape[0]):
+                currPartner = currPartnerAll[mp]
+                Pair(shift=0,
+                     animalIDs=[p, currPartner],
+                     epiNr=0,
+                     rng=[0, self.expInfo.numFrames],
+                     fullAn=True).joinExperiment(self)
 
     def splitToPairs(self):
         # Split raw data table into animal-pair-episodes
@@ -675,8 +696,12 @@ class experiment(object):
         return anSize
 
     def addPair(self, pair):
-        self.pair.append(pair)
-        return self.pair[-1]
+        if pair.fullAn:
+            self.pair_f.append(pair)
+            return self.pair_f[-1]
+        else:
+            self.pair.append(pair)
+            return self.pair[-1]
 
     def addAnimal(self, animal):
         self.animals.append(animal)

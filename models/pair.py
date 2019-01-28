@@ -14,7 +14,7 @@ import warnings
 class Pair(object):
     # Class defining one pair of animals during one experiment episode
 
-    def __init__(self, shift=[0,0], animalIDs=[0, 1], rng=[], epiNr=None):
+    def __init__(self, shift=[0,0], animalIDs=[0, 1], rng=[], epiNr=None,fullAn=False):
 
         self.epiNr = epiNr          # Episode number to use in this instance
         self.shift = shift          # tags pair for calculation of control shifted data
@@ -22,7 +22,7 @@ class Pair(object):
         self.animals = []           # Place holder for list of animal instances
         self.experiment = None      # Place holder for parent experiment reference
         self.rng = None             # Place holder for range of frames belonging to this pair-episode
-
+        self.fullAn = fullAn        # tags pair as full experiment data. Append to pair_f in experiment.
         self.rng = rng
 
     def addAnimal(self, animal):
