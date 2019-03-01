@@ -67,12 +67,17 @@ class AnimalTimeSeriesCollection:
             x = self.animal.experiment.rawTra.iloc[:, currCols]
             return Trajectory(np.roll(x, 0, axis=0))
 
-    # def trackedHeading(self):
-    #     a = self.animalIndex
-    #     rng = self.animal.pair.rng
-    #     currCols = [a * 3 + 2]
-    #     x = self.animal.pair.experiment.rawTra.iloc[rng[0]:rng[1], currCols]
-    #     return self.timeShift(x)
+    def trackedHeading(self):  # This is MUCH more precise than post-hoc computation from integer position data.
+        a = self.animalIndex
+        currCols = [a * 3 + 2]
+        if self.animal.paired:
+            rng = self.animal.pair.rng
+            x = self.animal.pair.experiment.rawTra.iloc[rng[0]:rng[1]-1, currCols]
+
+        else:
+            x = self.animal.experiment.rawTra.iloc[:-1, currCols]
+
+        return np.squeeze(self.timeShift(x))
         
 # --------------------------
 # derived time series
@@ -127,12 +132,15 @@ class AnimalTimeSeriesCollection:
     def accel(self):
         return np.diff(self.speed_smooth())
         
-    def heading(self):
+    def heading(self):  # Abandoned using this February 2019. Use trackedHeading instead!
         return mu.cart2pol(*self.d_position_Smooth().xy.T)[0] #heading[0] = heading, heading[1] = speed
         #heading: pointing right = 0, pointung up = pi/2  
 
     def d_heading(self):
         return np.diff(self.heading())
+
+    def d_trackedHeading(self):
+        return np.diff(self.trackedHeading())
         
     #currently, this is the position of the neighbor, relative to focal animal name is misleading...
     def position_relative_to_neighbor(self):
@@ -143,13 +151,13 @@ class AnimalTimeSeriesCollection:
     def position_relative_to_neighbor_rot(self):
         relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor().xy.T)]
         relPosPolRot = np.squeeze(np.array(relPosPol).T)[:-1, :]
-        relPosPolRot[:, 0] = relPosPolRot[:, 0]-self.heading()
+        relPosPolRot[:, 0] = relPosPolRot[:, 0]-self.trackedHeading()
         x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])]
         x = np.squeeze(np.array(x).T)
         return Trajectory(x)
     
     #acceleration using rotation corrected data
-    #effectively splits acceleration into speeding [0] and turning [1]          
+    #effectively splits acceleration into speeding [0] and turning [1]
     def dd_pos_pol(self):
         x = [mu.cart2pol(*self.dd_position().xy.T)]
         x = np.squeeze(np.array(x)).T
@@ -157,14 +165,14 @@ class AnimalTimeSeriesCollection:
         
     def dd_pos_pol_rot(self):
         x_rot = self.dd_pos_pol().xy
-        x_rot[:, 0] = x_rot[:, 0]-self.heading()[:-1]
+        x_rot[:, 0] = x_rot[:, 0]-self.trackedHeading()[:-1]
         x_rot_cart = [mu.pol2cart(x_rot[:, 0], x_rot[:, 1])]
         x_rot_cart = np.squeeze(np.array(x_rot_cart)).T
         return Trajectory(x_rot_cart)
     
     
     #creates the neighbormat for current animal (where neighbor was)
-    #this map seems flipped both horizontally and vertically! vertical is corrected at plotting.    
+    #this map seems flipped both horizontally and vertically! vertical is corrected at plotting.
     def neighborMat(self):
         mapBins = self.mapBins
         neighborMat = np.zeros([62, 62])
