@@ -95,3 +95,11 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
     plt.register_cmap(cmap=newcmap)
 
     return newcmap
+
+def speedFft(data):
+    tmp=data-np.nanmean(data)
+    tmp=tmp[~np.isnan(tmp)]
+    freqs = np.fft.fftfreq(tmp.size,1)
+    idx = np.argsort(freqs)
+    ps = np.abs(np.fft.fft(tmp))**2
+    return freqs[idx],ps[idx]
