@@ -17,7 +17,7 @@ def readExperiment(csvFile, keepData=False):
         return 1
 
 
-def savedCsvToDf(txtPaths, baseDir='d:\\data\\', seachString='*siSummary*.csv'):
+def savedCsvToDf(txtPaths, baseDir='d:\\data\\', seachString='*siSummary*.csv',noOfAnimals=15):
     csvPath = []
     for f in [mu.splitall(x)[-1][:-4] for x in txtPaths]:
         csvPath.append(glob.glob(baseDir+f+seachString)[0])
@@ -28,7 +28,7 @@ def savedCsvToDf(txtPaths, baseDir='d:\\data\\', seachString='*siSummary*.csv'):
         print(fn)
         tmp = pd.read_csv(fn, index_col=0, sep=',')
         tmp.animalSet = i
-        tmp.animalIndex = tmp.animalIndex+(i*15)
+        tmp.animalIndex = tmp.animalIndex+(i*noOfAnimals)
         df = pd.concat([df, tmp])
         i += 1
     return df
