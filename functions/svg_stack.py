@@ -516,7 +516,6 @@ class BoxLayout(Layout):
                 # BoxLayout in which stretch is 0, but unfilled space
                 # exists.
 
-                # XXX TODO: what is Qt policy in this case?
                 stretch_hack = True
                 stretch_inc = 0
             else:

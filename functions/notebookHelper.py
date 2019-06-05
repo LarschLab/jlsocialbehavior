@@ -8,14 +8,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-
-def readExperiment(csvFile, keepData=False):
-    tmp = es.experiment_set(csvFile=csvFile)
+def readExperiment(csvFile, keepData=False, MissingOnly=True):
+    tmp = es.experiment_set(csvFile=csvFile, MissingOnly=MissingOnly)
     if keepData:
         return tmp
     else:
         return 1
-
 
 def savedCsvToDf(txtPaths, baseDir='d:\\data\\', seachString='*siSummary*.csv',noOfAnimals=15):
     csvPath = []
@@ -37,7 +35,7 @@ def savedCsvToDf(txtPaths, baseDir='d:\\data\\', seachString='*siSummary*.csv',n
 def computeExpTimeOfDay(df):
     d = df.time
     r = datetime(int(df.time.iloc[0][:4]), 1, 1)
-    t2 = [pd.to_datetime(x).replace(day=1, month=1)for x in df.time]
+    t2 = [pd.to_datetime(x).replace(day=1, month=1, year=r.year)for x in df.time]
     t3 = [(x-r)/pd.Timedelta('1 hour') for x in t2]
     df['t2'] = t2
     df['t3'] = t3

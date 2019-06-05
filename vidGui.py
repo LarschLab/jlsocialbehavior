@@ -61,7 +61,7 @@ class settings(object):
                  endFrame=10):
         self.startFrame=startFrame
         self.endFrame=endFrame      
-        self.currFrame=12000 # Can define the starting frame for the demo recording here.
+        self.currFrame=20000 # Can define the starting frame for the demo recording here.
         self.run=False
         self.vidRec=False
         self.haveVid=False

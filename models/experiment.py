@@ -50,8 +50,9 @@ class ExperimentMeta(object):
         self.episodePLcode = None
         self.pairListAll = None
         self.nShiftRuns = None
-        self.birthDayAll = None
-        self.expTime = None
+        self.anIDAll = None
+        self.birthDayAll = None # used to specify on loading until 2018, now adding age info from notebook
+        self.expTime = None # used to specify on loading until 2018, now adding expTime info from notebook
         self.SaveNeighborhoodMaps = None
         self.recomputeAnimalSize = None
         self.ComputeBouts = None
@@ -250,6 +251,13 @@ class ExperimentMeta(object):
             self.stimulusProtocol = 0
 
         try:
+            tmp = np.array(expinfo['anIDAll'].split())
+            self.anIDAll = np.array(tmp)
+        except KeyError:
+            print('Animal IDs not specified. Using running numbers during data loading.')
+            self.anIDAll = np.array(self.numPairs)
+
+        try:
             tmp = np.array(expinfo['birthDayAll'].split())
             tmp = [datetime.strptime(x, '%Y-%m-%d-%H-%M') for x in tmp]
             self.birthDayAll = np.array(tmp)
@@ -263,7 +271,7 @@ class ExperimentMeta(object):
                 self.birthDayAll = np.array([bdl[x] for x in bdg])
 
             except KeyError:
-                print('BirthDays not specified. Cannot determine animal age.')
+                print('BirthDays not specified. Cannot determine animal age during data loading.')
                 self.birthDayAll = np.repeat(np.nan, self.numPairs)
 
             except:
@@ -273,7 +281,7 @@ class ExperimentMeta(object):
         try:
             self.expTime = expinfo['expTime']
         except KeyError:
-            print('expTime not specified. Cannot determine animal age.')
+            print('expTime not specified. Cannot determine animal age during loading.')
             self.expTime = np.repeat(np.nan, self.numPairs)
 
         try:
@@ -467,6 +475,7 @@ class experiment(object):
         episodeName = self.episodeAll[episodeStartFrame]
         epiNr = np.array([x.epiNr for x in self.pair])
         bd = self.expInfo.birthDayAll[AnimalIndex]
+        anID = self.expInfo.anIDAll[AnimalIndex]
         if np.shape(self.anSize):
             anSize = self.anSize[AnimalIndex]
         else:
@@ -506,23 +515,13 @@ class experiment(object):
         except:
             print('Could not compute animal age at experiment date. Using default: 0')
             ageAll = np.zeros(avgSpeed.shape)
-            raise
 
-        #print(animalSet.shape,
-        #      AnimalIndex.shape,
-        #      cp.shape,
-        #      si.shape,
-        #      episodeName.squeeze().shape,
-        #      episodeStartFrame.shape,
-        #      inDishTime.shape,
-        #      epiNr.shape,
-        #      tRun.shape,
-        #      bd.shape,
-        #      ageAll.shape)
+
 
         df = pd.DataFrame(
             {'animalSet': animalSet,
              'animalIndex': AnimalIndex,
+             'animalID': anID,
              'CurrentPartner': cp,
              'si': si,
              'episode': episodeName.squeeze(),
