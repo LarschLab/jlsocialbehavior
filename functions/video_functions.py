@@ -203,7 +203,7 @@ def getMedVideo(aviPath,FramesToAvg=9,saveFile=1,forceInput=0,bg_file='',saveAll
     
     head, tail = os.path.split(aviPath)
     if bg_file=='':
-        bg_file=(head+'/bgMed.tif')
+        bg_file=(aviPath[:-4]+'_bgMed.tif')
     
     #print bg_file
     if np.equal(~os.path.isfile(bg_file),-2) and not forceInput:
@@ -228,7 +228,7 @@ def getMedVideo(aviPath,FramesToAvg=9,saveFile=1,forceInput=0,bg_file='',saveAll
         img1=cap.read()
         gray = cv2.cvtColor(img1[1], cv2.COLOR_BGR2GRAY)
         allMed=gray.copy()
-        for i in range(10,numFrames-2,np.round(numFrames/FramesToAvg)): #use FramesToAvg images to calculate median
+        for i in range(10,numFrames-2,int(np.round(numFrames/FramesToAvg))): #use FramesToAvg images to calculate median
             cap.set(cv2.CAP_PROP_POS_FRAMES,i)
             image=cap.read()
             print(i)
