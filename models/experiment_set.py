@@ -72,6 +72,7 @@ import matplotlib
 from datetime import datetime
 import glob
 import pandas as pd
+import numpy as np
 
 
 class experiment_set(object):
@@ -84,8 +85,16 @@ class experiment_set(object):
         self.df = None
         self.experiments = None
         self.pdf = None
+        self.numExpts = None
         self.process_csv_experiment_list()
 
+
+    def getAnimalPerExp(self):
+        a=np.array([e.expInfo.numPairs for e in self.experiments])
+        b=np.arange(a.shape[0])
+        z = np.concatenate([np.repeat(c, d) for c, d in zip(b, a)])
+        e=np.concatenate([np.arange(x) for x in a])
+        return a, z,e
 
 
     def process_csv_experiment_list(self):
@@ -94,6 +103,7 @@ class experiment_set(object):
         self.experiments = []
 
         numExpts = self.df.shape[0]
+        self.numExpts = numExpts
 
         for index, row in self.df.iterrows():
 

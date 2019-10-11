@@ -9,9 +9,12 @@ import os
 import functions.video_functions as vf
 import functions.CameraInterceptCorrection as cic
 
-def getAnimalSizeFromVideo(currAvi,rawData,sizePercentile=40,numPairs=15, roiPath=[]):
-    xMax=2048.0 #relevant for openGL scaling
-    numFrames=2000#2000
+def getAnimalSizeFromVideo(currAvi,rawData,camHeight, sizePercentile=40,numPairs=15, roiPath=[]):
+    videoInfo = vf.getVideoProperties(currAvi)
+    xMax = int(videoInfo['width']) #relevant for openGL scaling
+    yMax = int(videoInfo['height'])
+
+    numFrames=1000#2000
     maxFrames=100000
     boxSize=200
     head, tail = os.path.split(currAvi)
@@ -26,6 +29,7 @@ def getAnimalSizeFromVideo(currAvi,rawData,sizePercentile=40,numPairs=15, roiPat
         #for virtual pairing, can use random frames, no need to avoid collisions
         traAll=np.zeros((numFrames,numPairs,2))
         frames=np.random.randint(1000,20000,numFrames)
+        print('using random frames, decorrected position to determine size. correction: ',xMax,yMax,camHeight)
         for i in range(numPairs):
             currCols=[i*3,i*3+1]
             rawTra=rawData[rawData.columns[currCols]].values
@@ -34,12 +38,13 @@ def getAnimalSizeFromVideo(currAvi,rawData,sizePercentile=40,numPairs=15, roiPat
             yy=rawTra[:,1]
             xoff=rois[i,0]
             yoff=rois[i,1]
-            xx,yy=cic.deCorrectFish(xx,yy,xoff,yoff,xMax,53.)
+            xx,yy=cic.deCorrectFish(xx,yy,xoff,yoff,xMax,yMax,camHeight)
             tra[:,0]=xx+xoff
             tra[:,1]=yy+yoff
             traAll[:,i,:]=tra[frames,:].copy()           
         
     else:
+        print('using non-collisions and raw position to determine size.')
         currCols=[0,1,3,4]
         rawTra=rawData[rawData.columns[currCols]].values.reshape(-1,2,2)
         rois=np.loadtxt(roiPath,skiprows=1,delimiter=',')
@@ -88,4 +93,5 @@ def getAnimalSizeFromVideo(currAvi,rawData,sizePercentile=40,numPairs=15, roiPat
     with open(fnSizeAll,'wb') as f:
         np.savetxt(f,np.array(MA),fmt='%.5f')
         
-    return np.array(anSize)/self.pxPmm
+    return np.array(anSize)#/self.pxPmm
+

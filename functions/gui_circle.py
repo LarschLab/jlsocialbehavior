@@ -48,7 +48,7 @@ class gui_circles(object):
         #use WX to query user for number of arenas and arena diameter
         #ask() is a utility function to query user
         def ask(parent=None, message='', default_value=''):
-            dlg = wx.TextEntryDialog(parent, message, defaultValue=default_value)
+            dlg = wx.TextEntryDialog(parent, message, value=default_value)
             dlg.ShowModal()
             result = dlg.GetValue()
             dlg.Destroy()
@@ -57,7 +57,7 @@ class gui_circles(object):
         #get user input only if output file doesn't exist already or if forced to regenerate
         if ~np.equal(~os.path.isfile(out_file),-2) or force_input:
             
-            
+
             self.im = self.ax.imshow(self.frame[::-1,:], cmap='gray', extent=(0,xaxis,0,yaxis), picker=5)
             self.fig.canvas.draw()
             # Initialize wx App

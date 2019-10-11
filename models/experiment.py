@@ -25,8 +25,8 @@ import random
 
 class ExperimentMeta(object):
     # ExperimentMeta class collects file paths, arena and video parameters for one experiment
-    def __init__(self, trajectoryPath):
-
+    def __init__(self, expinfo):
+        trajectoryPath = expinfo['txtPath']
         self.trajectoryPathAll = np.array(trajectoryPath.split())
         self.trajectoryFileNum = self.trajectoryPathAll.shape[0]
         if self.trajectoryFileNum > 1:
@@ -67,6 +67,15 @@ class ExperimentMeta(object):
         self.numFrames = None
         self.fps = None
         self.pxPmm = None
+        self.readLim = None
+
+        try:
+            num_lines = sum(1 for line in open(self.trajectoryPath))
+            self.readLim = np.min([expinfo['readLim'], num_lines])
+            print('readLim: ' + str(self.readLim))
+        except KeyError:
+            print('readLim not specified. Using all data (default).')
+            self.readLim = None
 
         #Parse arguments from expinfo or use defaults with a notification.
 
@@ -80,7 +89,13 @@ class ExperimentMeta(object):
             raise
 
         try:
-            self.aviPath = expinfo['aviPath']
+            if expinfo['aviPath']=='default':
+                print('searching for default avi...')
+                head, tail = os.path.split(self.trajectoryPath)
+                self.aviPath = glob.glob(head+'\\*.avi')[0]
+                print('found: ',self.aviPath)
+            else:
+                self.aviPath = expinfo['aviPath']
             tmp = open(self.aviPath, 'r')
             tmp.close()
         except KeyError as error:
@@ -161,7 +176,15 @@ class ExperimentMeta(object):
             print('Attention! Using default video parameters: ', self.videoDims, self.numFrames, self.fps)
 
         try:
+            self.camHeight = expinfo['camHeight']
+
+        except KeyError:
+            print('camHeight not specified. Using 79 cm (default).')
+            self.camHeight = 79
+
+        try:
             self.minShift = expinfo['minShift'] * self.fps
+
         except KeyError:
             print('minShift not specified. Using 60 seconds (default).')
             self.minShift = 60 * self.fps
@@ -184,8 +207,9 @@ class ExperimentMeta(object):
                 self.anSizeFile = tmp[0]
                 print('AnSizeFile not specified. Found default.',self.anSizeFile)
             else:
-                print('No AnSizeFile specified and no default found.')
+
                 self.anSizeFile = -1
+                print('No AnSizeFile specified and no default found. recompute on demand')
 
         except FileNotFoundError:
             print('AnSizeFile specified but not found.')
@@ -255,7 +279,7 @@ class ExperimentMeta(object):
             self.anIDAll = np.array(tmp)
         except KeyError:
             print('Animal IDs not specified. Using running numbers during data loading.')
-            self.anIDAll = np.array(self.numPairs)
+            self.anIDAll = np.arange(self.numPairs)
 
         try:
             tmp = np.array(expinfo['birthDayAll'].split())
@@ -308,9 +332,17 @@ class ExperimentMeta(object):
             print('No skype roi found.')
             ROIpath = glob.glob(startDir + '\\bgMed_scale*')  # idTracker pipeline output
             if len(ROIpath) < 1:
-                print('No idTracker pipeline ROI found.')
-                ROIpath = None
-                raise NameError('no ROIs found')
+                ROIpath = glob.glob(startDir + '\\*bgMed.csv')  # medaka pipeline output
+                if len(ROIpath) < 1:
+
+                    print('No idTracker pipeline ROI found.')
+                    ROIpath = None
+                    raise NameError('no ROIs found')
+                else:
+                    print('medaka pipeline ROI found.')
+                    rois = np.loadtxt(ROIpath[0], skiprows=1, delimiter=',')
+                    r_px = rois.mean(axis=0)[3]
+                    print(r_px)
             else:
                 print('idTracker pipeline ROI found.')
                 rois = np.loadtxt(ROIpath[0], skiprows=1, delimiter=',')
@@ -336,11 +368,12 @@ class experiment(object):
         self.pair_f = []
         self.animals = []
         self.shiftList = None   # fix list for 'random' shifts for time shift control data.
+        self.pair2animal = []
 
         # imitate overload behavior
         if type(expDef) == pd.Series:       # typically, run with a pandas df row of arguments
 
-            self.expInfo = ExperimentMeta(expDef['txtPath'])    # initialize meta information
+            self.expInfo = ExperimentMeta(expDef)    # initialize meta information
             print('loading data', end="")
             self.rawTra, self.episodeAll = self.loadData()      # load raw data
             print(' ...done. Shape: ', self.rawTra.shape)
@@ -383,6 +416,18 @@ class experiment(object):
             print('Wrong experiment definition argument. Provide TxtPath or pd.Series')
             raise FileNotFoundError
 
+    def getAnimalData(self,anNr=0,anID=0,field='speed',neighbor=False):
+        epi = np.array([self.episodeAll[self.pair[x].rng[0]+10] for x in np.where(self.pair2animal == anNr)[0]])
+        if field=='speed':
+            tmp= np.array([self.pair[x].animals[anID].ts.speed() for x in np.where(self.pair2animal==anNr)[0]])
+        elif field=='relPos':
+            tmp = np.array([self.pair[x].animals[anID].ts.position_relative_to_neighbor_rot() for x in np.where(self.pair2animal == anNr)[0]])
+        elif field=='dStimSize':
+            tmp= np.array([self.pair[x].animals[anID].ts.dStimSize() for x in np.where(self.pair2animal==anNr)[0]])
+
+        return tmp,epi
+
+
     def linkFullAnimals(self):
         for i in range(self.expInfo.numPairs+1):# adding extra 'animal' which is stimulus!
             Animal(ID=i).joinExperiment(self)
@@ -421,6 +466,7 @@ class experiment(object):
         fps = self.expInfo.fps
         episodeDur = self.expInfo.episodeDur  # expected in minutes
         episodeFrames = fps * episodeDur * 60
+        pair2animal = []
 
         for i in range(episodes):
 
@@ -433,6 +479,7 @@ class experiment(object):
                 blockEpisodes = self.episodeAll[rng[0]:rng[1]]
 
                 if np.unique(blockEpisodes).shape[0] > 1:
+                    print(np.unique(self.episodeAll))
                     offset = offset + np.where(np.abs(np.diff(blockEpisodes)) > 0)[0][0]+1
                     print('episode transition detected at episode: ', i, '. applying offset: ', offset)
                     rng = np.array([offset + (i * episodeFrames), offset + ((i + 1) * episodeFrames)]).astype('int')
@@ -460,6 +507,8 @@ class experiment(object):
                 for mp in range(currPartnerAll.shape[0]):
                     currPartner = currPartnerAll[mp]
                     Pair(shift=0, animalIDs=[p, currPartner], epiNr=i, rng=rng).joinExperiment(self)
+                    pair2animal.append(p)
+        self.pair2animal = np.array(pair2animal)
 
     def saveExpData(self):
 
@@ -620,7 +669,9 @@ class experiment(object):
             VRformat = True
             rawData = pd.read_csv(self.expInfo.trajectoryPath,
                                   header=None,
-                                  delim_whitespace=True)
+                                  delim_whitespace=True,
+                                  nrows=self.expInfo.readLim)
+            print('VRtrack: '+self.expInfo.trajectoryPath + str(self.expInfo.readLim))
             episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
 
         if (self.expInfo.trajectoryFileNum > 1) and VRformat:
@@ -679,12 +730,16 @@ class experiment(object):
     def getAnimalSize(self):
 
         if self.expInfo.anSizeFile == -1:
+
             anSize = getAnimalSizeFromVideo(currAvi=self.expInfo.aviPath,
                                             rawData=self.rawTra,
                                             numPairs=self.expInfo.numPairs,
-                                            roiPath=self.expInfo.roiPath)
+                                            roiPath=self.expInfo.roiPath,
+                                            camHeight=self.expInfo.camHeight)/self.expInfo.pxPmm
 
+            self.expInfo.anSizeFile = self.expInfo.trajectoryPath[:-4]+'_anSize.csv'
             print('saving anSize to', self.expInfo.anSizeFile)
+
             np.savetxt(self.expInfo.anSizeFile, anSize)
             print('Animal Size saved.')
         else:

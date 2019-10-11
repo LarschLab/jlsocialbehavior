@@ -55,6 +55,13 @@ class AnimalTimeSeriesCollection:
 # fundamental time series
 # --------------------------
 
+    def stimSize(self):
+        if self.animal.paired:
+            rng = self.animal.pair.rng
+            x = self.animal.pair.experiment.rawTra.iloc[rng[0]:rng[1], -2]
+        else:
+            x = self.animal.experiment.rawTra.iloc[:, -2]
+        return np.squeeze(self.timeShift(x))
 
     def rawTra(self):
         a = self.animalIndex
@@ -82,6 +89,9 @@ class AnimalTimeSeriesCollection:
 # --------------------------
 # derived time series
 # --------------------------
+
+    def dStimSize(self):
+        return np.diff(self.stimSize())
         
     # convert pixels to mm and center on (0,0)
     def position(self):
