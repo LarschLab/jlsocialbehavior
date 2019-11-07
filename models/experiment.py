@@ -445,7 +445,7 @@ class experiment(object):
 
             for mp in range(currPartnerAll.shape[0]):
                 currPartner = currPartnerAll[mp]
-                Pair(shift=0,
+                Pair(shift=[0,0],
                      animalIDs=[p, currPartner],
                      epiNr=0,
                      rng=[0, self.expInfo.numFrames],
@@ -506,7 +506,7 @@ class experiment(object):
 
                 for mp in range(currPartnerAll.shape[0]):
                     currPartner = currPartnerAll[mp]
-                    Pair(shift=0, animalIDs=[p, currPartner], epiNr=i, rng=rng).joinExperiment(self)
+                    Pair(shift=[0,0], animalIDs=[p, currPartner], epiNr=i, rng=rng).joinExperiment(self)
                     pair2animal.append(p)
         self.pair2animal = np.array(pair2animal)
 
@@ -602,11 +602,11 @@ class experiment(object):
                 nmAll[i, 0, 0, :, :] = self.pair[i].animals[0].ts.neighborMat()
                 nmAll[i, 1, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
                 nmAll[i, 2, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
-                self.pair[i].shift = self.shiftList[0]
+                self.pair[i].shift = [self.shiftList[0],0]
                 nmAll[i, 0, 1, :, :] = self.pair[i].animals[0].ts.neighborMat()
                 nmAll[i, 1, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
                 nmAll[i, 2, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
-                self.pair[i].shift = 0
+                self.pair[i].shift = [0,0]
             #print(' done. Saving maps...', end="\r", flush=True)
             print(' done. Saving maps...', end="")
             npyFileOut = os.path.join(self.expInfo.processingDir, txtFn[:-4] + 'MapData.npy')
