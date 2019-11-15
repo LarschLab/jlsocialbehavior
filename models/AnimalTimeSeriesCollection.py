@@ -25,6 +25,7 @@ import functions.matrixUtilities_joh as mu
 import scipy.stats as sta
 import models.geometry as geometry
 import functions.peakdet as pkd
+from scipy.signal import medfilt
 
 class AnimalTimeSeriesCollection:
     def __init__(self):
@@ -85,7 +86,19 @@ class AnimalTimeSeriesCollection:
             x = self.animal.experiment.rawTra.iloc[:-1, currCols]
 
         return np.squeeze(self.timeShift(x))
-        
+
+    def trackedHeading_filt(self, window=61):  # Median filtered heading to avoid 180 deg jumps.
+        a = self.animalIndex
+        currCols = [a * 3 + 2]
+        if self.animal.paired:
+            rng = self.animal.pair.rng
+            x = self.animal.pair.experiment.rawTra.iloc[rng[0]:rng[1]-1, currCols]
+
+        else:
+            x = self.animal.experiment.rawTra.iloc[:-1, currCols]
+
+        x = medfilt(np.squeeze(self.timeShift(x)), window)
+        return x
 # --------------------------
 # derived time series
 # --------------------------
@@ -95,8 +108,8 @@ class AnimalTimeSeriesCollection:
         
     # convert pixels to mm and center on (0,0)
     def position(self):
-        # currCenterPx = self.animal.pair.experiment.expInfo.rois[self.animalIndex, -1] + 2
-        currCenterPx = 0
+        currCenterPx = self.animal.pair.experiment.expInfo.rois[self.animalIndex-1, -1] + 2
+        #currCenterPx = 0
         arenaCenterPx = np.array([currCenterPx, currCenterPx])
         x = (self.rawTra().xy-arenaCenterPx) / self.pxPmm
         return Trajectory(x)
@@ -159,21 +172,35 @@ class AnimalTimeSeriesCollection:
         
     #rotate self to face up in order to map neighbor position relative to self
     def position_relative_to_neighbor_rot(self):
+
         relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor().xy.T)]
         relPosPolRot = np.squeeze(np.array(relPosPol).T)[:-1, :]
         relPosPolRot[:, 0] = relPosPolRot[:, 0]-self.trackedHeading()
         x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])]
         x = np.squeeze(np.array(x).T)
         return Trajectory(x)
-    
+
+    #rotate self to face up in order to map neighbor position relative to self
+    def position_relative_to_neighbor_rot_filt(self, window=61):
+
+        relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor().xy.T)]
+        relPosPolRot = np.squeeze(np.array(relPosPol).T)[:-1, :]
+        relPosPolRot[:, 0] = relPosPolRot[:, 0]-self.trackedHeading_filt(window=window)
+        x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])]
+        x = np.squeeze(np.array(x).T)
+        return Trajectory(x)
+
+
     #acceleration using rotation corrected data
     #effectively splits acceleration into speeding [0] and turning [1]
     def dd_pos_pol(self):
+
         x = [mu.cart2pol(*self.dd_position().xy.T)]
         x = np.squeeze(np.array(x)).T
         return Trajectory(x)
         
     def dd_pos_pol_rot(self):
+
         x_rot = self.dd_pos_pol().xy
         x_rot[:, 0] = x_rot[:, 0]-self.trackedHeading()[:-1]
         x_rot_cart = [mu.pol2cart(x_rot[:, 0], x_rot[:, 1])]
@@ -192,7 +219,18 @@ class AnimalTimeSeriesCollection:
                                      bins=[mapBins, mapBins],
                                      normed=True)[0]*neighborMat.shape[0]**2
         return neighborMat
-        
+
+
+    def neighborMat_filt(self, window=61):
+        mapBins = self.mapBins
+        neighborMat = np.zeros([62, 62])
+        pos = self.position_relative_to_neighbor_rot_filt(window=window).xy
+        pos = pos[~np.isnan(pos).any(axis=1), :]
+        neighborMat = np.histogramdd(pos,
+                                     bins=[mapBins, mapBins],
+                                     normed=True)[0]*neighborMat.shape[0]**2
+        return neighborMat
+
 #-------simple bout analysis------
     def boutStart(self):
         return pkd.detect_peaks(self.speed_smooth(), mph=5, mpd=8)
