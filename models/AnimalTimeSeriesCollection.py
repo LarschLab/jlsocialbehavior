@@ -108,7 +108,12 @@ class AnimalTimeSeriesCollection:
         
     # convert pixels to mm and center on (0,0)
     def position(self):
-        currCenterPx = self.animal.pair.experiment.expInfo.rois[self.animalIndex-1, -1] + 2
+        # center position on 0,0 for convenient conversion into polar coordinates.
+        # using dish circle ROI from ROI file to define center
+        # last column in ROI file defines radius. Add 2px because the video pieces extend 2 px beyond the circle ROI.
+        FocalID = self.animal.pair.animalIDs[0] # get ID of the focal animal in this pair.
+        # !! This ensures that animal and stimulus are shifted by the same amount !!
+        currCenterPx = self.animal.pair.experiment.expInfo.rois[FocalID, -1] + 2
         #currCenterPx = 0
         arenaCenterPx = np.array([currCenterPx, currCenterPx])
         x = (self.rawTra().xy-arenaCenterPx) / self.pxPmm
