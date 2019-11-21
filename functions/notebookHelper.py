@@ -6,7 +6,88 @@ import pandas as pd
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import AxesGrid
+import matplotlib
+from scipy import stats
+import statsmodels.stats.api as sms
 
+
+# function to calculate Cohen's d for independent samples
+def cohend(d1, d2):
+    # calculate the size of samples
+    n1, n2 = len(d1), len(d2)
+    # calculate the variance of the samples
+    s1, s2 = np.var(d1, ddof=1), np.var(d2, ddof=1)
+    # calculate the pooled standard deviation
+    s = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
+    # calculate the means of the samples
+    u1, u2 = np.mean(d1), np.mean(d2)
+    # calculate the effect size
+    return (u1 - u2) / s
+
+def groupCohen(x, cat='wt'):
+    dat=x.copy()
+    dat.set_index(['animalIndex', cat])
+
+    catLevels = x[cat].unique()
+    catLevels.sort()
+
+    if len(catLevels) > 1:
+        d1 = dat[dat[cat] == catLevels[1]].dropna().iloc[:,2:]
+        d2 = dat[dat[cat] == catLevels[0]].dropna().iloc[:,2:]
+
+        # calculate the size of samples
+        n1, n2 = len(d1), len(d2)
+        # calculate the variance of the samples
+        s1, s2 = np.var(d1, ddof=1), np.var(d2, ddof=1)
+        # calculate the pooled standard deviation
+        s = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
+        # calculate the means of the samples
+        u1, u2 = np.mean(d1), np.mean(d2)
+        # calculate the effect size
+        return (u2 - u1) / s
+    else:
+        ret=pd.Series(np.zeros(dat.shape[1]-2) * np.nan, index=dat.columns.values[2:])
+        return ret
+
+
+def groupPower(x, cat='wt'):
+    dat = x.groupby(['animalIndex', cat]).si.mean().unstack().reset_index()
+    names = ['mnA', 'mnB', 'mnDiff', 'p', 'es', 'P', 'nA', 'nB', 'esReal', 'sPooled', 'sensitivity']
+    catLevels = x[cat].unique()
+    catLevels.sort()
+    # if dat.shape[1] > 2:
+    if len(catLevels) > 1:
+        a = dat[catLevels[0]].dropna()
+        b = dat[catLevels[1]].dropna()
+        p = stats.ttest_ind(a, b, equal_var=False)[1]
+
+        effectSize = 1
+        r = len(a) / len(b)
+        nobs1 = len(b)
+        mnDiff = a.mean() - b.mean()
+        effectSizeReal = cohend(a, b)
+        n1, n2 = len(a), len(b)
+        s1, s2 = np.var(a, ddof=1), np.var(b, ddof=1)
+        s = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
+
+        P = sms.TTestIndPower().solve_power(effectSize, power=None, alpha=0.05, ratio=r, nobs1=nobs1)
+        # Preal=sms.TTestIndPower().solve_power(esReal, power=None, alpha=0.05, ratio=r,nobs1=nobs1)
+        sens = sms.TTestIndPower().solve_power(effect_size=None, power=0.9, alpha=0.05, ratio=r, nobs1=nobs1)
+
+        return pd.Series([a.mean(),
+                          b.mean(),
+                          mnDiff,
+                          p,
+                          effectSize,
+                          P,
+                          len(a),
+                          len(b),
+                          effectSizeReal,
+                          s,
+                          sens], index=names)
+    else:
+        return pd.Series(np.zeros(len(names)) * np.nan, index=names)
 
 def readExperiment(csvFile, keepData=False, MissingOnly=True):
     tmp = es.experiment_set(csvFile=csvFile, MissingOnly=MissingOnly)
@@ -41,8 +122,7 @@ def computeExpTimeOfDay(df):
     df['t3'] = t3
     return df
 
-from mpl_toolkits.axes_grid1 import AxesGrid
-import matplotlib
+
 def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
     '''
     Function to offset the "center" of a colormap. Useful for
