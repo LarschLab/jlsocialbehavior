@@ -599,17 +599,28 @@ class experiment(object):
 
         if self.expInfo.SaveNeighborhoodMaps:
             numepiAll = self.expInfo.episodes * self.expInfo.numPairs
-            nmAll = np.zeros((numepiAll, 3, 2, 62, 62))  # animal,[neighbor,speed,turn],[data,shuffle0],[mapDims]
+            nmAll = np.zeros((numepiAll, 6, 2, 62, 62))  # animal,[neighbor,speed,turn, neighbor filt,speed filt,turn filt],[data,shuffle0],[mapDims]
             #print('Computing neighborhood maps... ', end="\r", flush=True)
             print('Computing neighborhood maps... ', end="")
             for i in range(numepiAll):
+
                 nmAll[i, 0, 0, :, :] = self.pair[i].animals[0].ts.neighborMat()
                 nmAll[i, 1, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
                 nmAll[i, 2, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
+                #using median filtered tracked heading
+                nmAll[i, 3, 0, :, :] = self.pair[i].animals[0].ts.neighborMat_filt()
+                nmAll[i, 4, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt()
+                nmAll[i, 5, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt()
+
                 self.pair[i].shift = [self.shiftList[0],0]
                 nmAll[i, 0, 1, :, :] = self.pair[i].animals[0].ts.neighborMat()
                 nmAll[i, 1, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
                 nmAll[i, 2, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
+                # using median filtered tracked heading
+                nmAll[i, 3, 1, :, :] = self.pair[i].animals[0].ts.neighborMat_filt()
+                nmAll[i, 4, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt()
+                nmAll[i, 5, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt()
+
                 self.pair[i].shift = [0,0]
             #print(' done. Saving maps...', end="\r", flush=True)
             print(' done. Saving maps...', end="")
