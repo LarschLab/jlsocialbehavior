@@ -212,7 +212,14 @@ class AnimalTimeSeriesCollection:
         x_rot_cart = np.squeeze(np.array(x_rot_cart)).T
         return Trajectory(x_rot_cart)
     
-    
+    def dd_pos_pol_rot_filt(self, window=61):
+
+        x_rot = self.dd_pos_pol().xy
+        x_rot[:, 0] = x_rot[:, 0]-self.trackedHeading_filt(window=window)[:-1]
+        x_rot_cart = [mu.pol2cart(x_rot[:, 0], x_rot[:, 1])]
+        x_rot_cart = np.squeeze(np.array(x_rot_cart)).T
+        return Trajectory(x_rot_cart)
+
     #creates the neighbormat for current animal (where neighbor was)
     #this map seems flipped both horizontally and vertically! vertical is corrected at plotting.
     def neighborMat(self):
@@ -224,7 +231,6 @@ class AnimalTimeSeriesCollection:
                                      bins=[mapBins, mapBins],
                                      normed=True)[0]*neighborMat.shape[0]**2
         return neighborMat
-
 
     def neighborMat_filt(self, window=61):
         mapBins = self.mapBins
@@ -261,8 +267,8 @@ class AnimalTimeSeriesCollection:
                                        position_relative_to_neighbor_rot.y()[1:],
                                        self.dd_pos_pol_rot().xy[:, 0],
                                        bins=[mapBins, mapBins])[0]
-    
-    #turn - using only acceleration component perpendicular to heading   
+
+    #turn - using only acceleration component perpendicular to heading
     def ForceMat_turn(self):
         mapBins = self.mapBins
         position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot()
@@ -270,7 +276,27 @@ class AnimalTimeSeriesCollection:
                                        position_relative_to_neighbor_rot.y()[1:],
                                        self.dd_pos_pol_rot().xy[:, 1],
                                        bins=[mapBins, mapBins])[0]
-    
+
+    # speed - using only acceleration component aligned with heading
+    def ForceMat_speed_filt(self, window=61):
+
+        mapBins = self.mapBins
+        position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot_filt(window=window)
+        return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
+                                       position_relative_to_neighbor_rot.y()[1:],
+                                       self.dd_pos_pol_rot_filt(window=window).xy[:, 0],
+                                       bins=[mapBins, mapBins])[0]
+
+    #turn - using only acceleration component perpendicular to heading
+    def ForceMat_turn_filt(self, window=61):
+
+        mapBins = self.mapBins
+        position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot_filt(window=window)
+        return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
+                                       position_relative_to_neighbor_rot.y()[1:],
+                                       self.dd_pos_pol_rot_filt(window=window).xy[:, 1],
+                                       bins=[mapBins, mapBins])[0]
+
     #percentage of time the neighbor animal was in front vs. behind focal animal
     def FrontnessIndex(self):
         PosMat = self.neighborMat()
