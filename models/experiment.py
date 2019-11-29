@@ -106,6 +106,10 @@ class ExperimentMeta(object):
             print('No video file specified. Will resort to defaults.', error)
             self.aviPath = None
 
+        except IndexError as error:
+            print('No video file specified. Will resort to defaults.', error)
+            self.aviPath = None
+
         except FileNotFoundError as error:
             print('Specified video file not found.', error)
             self.aviPath = None
