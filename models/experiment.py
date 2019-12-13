@@ -393,6 +393,24 @@ class experiment(object):
             #        for x in range(self.expInfo.nShiftRuns)])
             #shiftB=shiftA+self.expInfo.minShift
 
+            ## Shifting strategy as of Dec 2019:
+
+            # generate list with pre-defined regularly spaced shift intervals for reproducible results
+            # (as opposed to randomized shift on each analysis run)
+            #
+            # shiftList is (nShifts,2) matrix
+            # nShift tuples to shift animals 1(shiftA) and 2(shiftB), respectively
+            # shift amounts are determined to cover the following range:
+            # for animal 1: from minShift to shiftMid (middle of episode duration)
+            # for animal 2: from shiftMid + minshift to episode duration - minShift (reversed order)
+            # this should ensure that all shift combinations differ > minShift but with repeating stimuli, there may be rare 'unfortunate' combinations.
+            # shiftMid is calculated based on episodeDur(minutes), --> resulting unit = frames
+            # expInfo.minShift is specified in seconds as input argument via notebook and transformed to frames in the expInfo class.
+
+            # During calculation of Shoaling Index, all shifts are used to create a mean null expectation.
+            # For saved neighborhood maps, only one shift is used by default to save time.
+
+
             shiftMid=int(0.5*self.expInfo.episodeDur*self.expInfo.fps*60)
             shiftA= np.linspace(self.expInfo.minShift,
                                 shiftMid,
