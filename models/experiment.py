@@ -68,6 +68,7 @@ class ExperimentMeta(object):
         self.fps = None
         self.pxPmm = None
         self.readLim = None
+        self.filteredMaps = None
 
         try:
             num_lines = sum(1 for line in open(self.trajectoryPath))
@@ -247,6 +248,12 @@ class ExperimentMeta(object):
         except KeyError:
             print('SaveNeighborhoodMaps not specified. Using default: True')
             self.SaveNeighborhoodMaps = True
+
+        try:
+            self.filteredMaps = expinfo['filteredMaps']
+        except KeyError:
+            print('filteredMaps not specified. Using default: False')
+            self.filteredMaps = False
 
         try:
             self.recomputeAnimalSize = expinfo['recomputeAnimalSize']
@@ -625,21 +632,28 @@ class experiment(object):
                 nmAll[i, 0, 0, :, :] = self.pair[i].animals[0].ts.neighborMat()
                 nmAll[i, 1, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
                 nmAll[i, 2, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
-                #using median filtered tracked heading
-                nmAll[i, 3, 0, :, :] = self.pair[i].animals[0].ts.neighborMat_filt()
-                nmAll[i, 4, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt()
-                nmAll[i, 5, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt()
 
-                self.pair[i].shift = [self.shiftList[0],0]
+                self.pair[i].shift = [self.shiftList[0], 0]
                 nmAll[i, 0, 1, :, :] = self.pair[i].animals[0].ts.neighborMat()
                 nmAll[i, 1, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
                 nmAll[i, 2, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
-                # using median filtered tracked heading
-                nmAll[i, 3, 1, :, :] = self.pair[i].animals[0].ts.neighborMat_filt()
-                nmAll[i, 4, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt()
-                nmAll[i, 5, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt()
 
-                self.pair[i].shift = [0,0]
+                self.pair[i].shift = [0, 0]
+
+                #using median filtered tracked heading
+
+                if self.expInfo.filteredMaps:
+                    nmAll[i, 3, 0, :, :] = self.pair[i].animals[0].ts.neighborMat_filt()
+                    nmAll[i, 4, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt()
+                    nmAll[i, 5, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt()
+
+                    self.pair[i].shift = [self.shiftList[0], 0]
+                    # using median filtered tracked heading
+                    nmAll[i, 3, 1, :, :] = self.pair[i].animals[0].ts.neighborMat_filt()
+                    nmAll[i, 4, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt()
+                    nmAll[i, 5, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt()
+
+                    self.pair[i].shift = [0,0]
             #print(' done. Saving maps...', end="\r", flush=True)
             print(' done. Saving maps...', end="")
             npyFileOut = os.path.join(self.expInfo.processingDir, txtFn[:-4] + 'MapData.npy')
