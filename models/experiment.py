@@ -26,13 +26,26 @@ import random
 class ExperimentMeta(object):
     # ExperimentMeta class collects file paths, arena and video parameters for one experiment
     def __init__(self, expinfo):
-        trajectoryPath = expinfo['txtPath']
-        self.trajectoryPathAll = np.array(trajectoryPath.split())
-        self.trajectoryFileNum = self.trajectoryPathAll.shape[0]
-        if self.trajectoryFileNum > 1:
-            self.trajectoryPath = self.trajectoryPathAll[0]
+
+        if str(expinfo):
+            self.trajectoryPath = expinfo
         else:
-            self.trajectoryPath = trajectoryPath
+
+            trajectoryPath = expinfo['txtPath']
+            self.trajectoryPathAll = np.array(trajectoryPath.split())
+            self.trajectoryFileNum = self.trajectoryPathAll.shape[0]
+            if self.trajectoryFileNum > 1:
+                self.trajectoryPath = self.trajectoryPathAll[0]
+            else:
+                self.trajectoryPath = trajectoryPath
+
+            try:
+                num_lines = sum(1 for line in open(self.trajectoryPath))
+                self.readLim = np.min([expinfo['readLim'], num_lines])
+                print('readLim: ' + str(self.readLim))
+            except KeyError:
+                print('readLim not specified. Using all data (default).')
+                self.readLim = None
 
         self.aviPath = None
         self.aspPath = None
@@ -70,13 +83,7 @@ class ExperimentMeta(object):
         self.readLim = None
         self.filteredMaps = None
 
-        try:
-            num_lines = sum(1 for line in open(self.trajectoryPath))
-            self.readLim = np.min([expinfo['readLim'], num_lines])
-            print('readLim: ' + str(self.readLim))
-        except KeyError:
-            print('readLim not specified. Using all data (default).')
-            self.readLim = None
+
 
         #Parse arguments from expinfo or use defaults with a notification.
 
@@ -468,17 +475,17 @@ class experiment(object):
         else:
             pairList = self.expInfo.pairListAll
 
-        for p in range(self.expInfo.numPairs):
+            for p in range(self.expInfo.numPairs):
 
-            currPartnerAll = np.where(pairList[:, p])[0]
+                currPartnerAll = np.where(pairList[:, p])[0]
 
-            for mp in range(currPartnerAll.shape[0]):
-                currPartner = currPartnerAll[mp]
-                Pair(shift=[0,0],
-                     animalIDs=[p, currPartner],
-                     epiNr=0,
-                     rng=[0, self.expInfo.numFrames],
-                     fullAn=True).joinExperiment(self)
+                for mp in range(currPartnerAll.shape[0]):
+                    currPartner = currPartnerAll[mp]
+                    Pair(shift=[0,0],
+                         animalIDs=[p, currPartner],
+                         epiNr=0,
+                         rng=[0, self.expInfo.numFrames],
+                         fullAn=True).joinExperiment(self)
 
     def splitToPairs(self):
         # Split raw data table into animal-pair-episodes
@@ -721,7 +728,7 @@ class experiment(object):
             print('VRtrack: '+self.expInfo.trajectoryPath + str(self.expInfo.readLim))
             episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
 
-        if (self.expInfo.trajectoryFileNum > 1) and VRformat:
+        if (str(self.expInfo) is False) and (self.expInfo.trajectoryFileNum > 1) and VRformat:
             print('More than one trajectory file, loading all:', end='\r')
             fnCombinedData = self.expInfo.trajectoryPathAll[-1][:-7]+'all'+'.h5'
             if np.equal(~os.path.isfile(fnCombinedData), -1):

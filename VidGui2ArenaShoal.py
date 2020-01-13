@@ -25,10 +25,10 @@ import functions.CameraInterceptCorrection as cic
 class settings(object):
 
     def __init__(self, startFrame=0,
-                 endFrame=225000+600):
+                 endFrame=600):
         self.startFrame=startFrame
         self.endFrame=endFrame      
-        self.currFrame=225000-300
+        self.currFrame=300
         self.run=False
         self.vidRec=False
         self.haveVid=False
@@ -51,7 +51,7 @@ class settings(object):
 
 class vidGui(object):
 
-    window_name = "vidGUI"
+    window_name = "vidGui"
     def __init__(self, path,e1,df,ROIdf,PLdf):
         self.settings=settings()
         self.df=df
@@ -66,13 +66,13 @@ class vidGui(object):
 
         cv2.setMouseCallback(self.window_name, self.startStop)
         cv2.createTrackbar("startFrame", self.window_name,
-                           self.settings.startFrame, 225000+600,
+                           self.settings.startFrame, 600,
                            self.set_startFrame)
         cv2.createTrackbar("endFrame", self.window_name,
-                           self.settings.endFrame, 225000+600,
+                           self.settings.endFrame, 600,
                            self.set_endFrame)
         cv2.createTrackbar("currFrame", self.window_name,
-                           self.settings.currFrame, 225000+600,
+                           self.settings.currFrame, 600,
                            self.set_currFrame)
     
     def startStop(self,event, x, y, flags, param):
@@ -228,6 +228,9 @@ class vidGui(object):
 #p='C:\\Users\\johannes\\Dropbox\\20170131_VR_skypeVsTrefoil_01\\'
 #p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'; avi_path=p+'out_id0_30fps_20170710124615.avi' #frame: 82800
 p='D:\\data\\b\\2017\\20170921_SkypePairPermutations\\'; avi_path=p+'out_id0_30fps_20170921120214.avi'#frame 53700
+
+#p='E:\\b\\medaka\\20200110_15animals_skypeAndKnot\\'; avi_path=p+'out_id0_30fps_20200110161244.avi'#frame 53700
+
 #avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
 
 
