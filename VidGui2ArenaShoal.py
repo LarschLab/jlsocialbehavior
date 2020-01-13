@@ -25,26 +25,26 @@ import functions.CameraInterceptCorrection as cic
 class settings(object):
 
     def __init__(self, startFrame=0,
-                 endFrame=225000+600):
+                 endFrame=108000+6000):
         self.startFrame=startFrame
         self.endFrame=endFrame      
-        self.currFrame=225000-300
+        self.currFrame=108000-3000
         self.run=False
         self.vidRec=False
         self.haveVid=False
         self.drawStim=True
         self.drawAn=False
-        self.drawStimPath=True
-        self.drawAnPath=True
+        self.drawStimPath=False
+        self.drawAnPath=False
         self.drawAnSize=8
-        self.drawStimSize=8
+        self.drawStimSize=4
         self.drawAnPathSize=2
         self.drawStimPathSize=2
         self.drawArenas=True
         self.drawTime=True
         self.drawAnCol=(0,0,0)
         self.drawStimCol=(0,0,1)
-        self.drawTailLen=200
+        self.drawTailLen=10
         self.drawTailStep=10.0
         self.drawVideoFrame=True
         self.PLcode=True
@@ -66,13 +66,13 @@ class vidGui(object):
 
         cv2.setMouseCallback(self.window_name, self.startStop)
         cv2.createTrackbar("startFrame", self.window_name,
-                           self.settings.startFrame, 225000+600,
+                           self.settings.startFrame, 108000-6000,
                            self.set_startFrame)
         cv2.createTrackbar("endFrame", self.window_name,
-                           self.settings.endFrame, 225000+600,
+                           self.settings.endFrame, 108000+6000,
                            self.set_endFrame)
         cv2.createTrackbar("currFrame", self.window_name,
-                           self.settings.currFrame, 225000+600,
+                           self.settings.currFrame, 108000+3000,
                            self.set_currFrame)
     
     def startStop(self,event, x, y, flags, param):
@@ -227,7 +227,9 @@ class vidGui(object):
 #p='D:\\data\\b\\2017\\20170131_VR_skypeVsTrefoil\\01_skypeVsTrefoil_blackDisk002\\'
 #p='C:\\Users\\johannes\\Dropbox\\20170131_VR_skypeVsTrefoil_01\\'
 #p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'; avi_path=p+'out_id0_30fps_20170710124615.avi' #frame: 82800
-p='D:\\data\\b\\2017\\20170921_SkypePairPermutations\\'; avi_path=p+'out_id0_30fps_20170921120214.avi'#frame 53700
+#p='D:\\data\\b\\2017\\20170921_SkypePairPermutations\\'; avi_path=p+'out_id0_30fps_20170921120214.avi'#frame 53700
+
+p='E:\\b\\medaka\\20200110_15animals_skypeAndKnot\\'; avi_path=p+'out_id0_30fps_20200110161244.avi'#frame 53700
 #avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
 
 
