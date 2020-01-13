@@ -22,13 +22,14 @@ import pandas as pd
 import datetime
 import functions.CameraInterceptCorrection as cic
 
+
 class settings(object):
 
     def __init__(self, startFrame=0,
-                 endFrame=108000+6000):
+                 endFrame=1000+12000):
         self.startFrame=startFrame
         self.endFrame=endFrame      
-        self.currFrame=108000-3000
+        self.currFrame=1000
         self.run=False
         self.vidRec=False
         self.haveVid=False
@@ -44,8 +45,8 @@ class settings(object):
         self.drawTime=True
         self.drawAnCol=(0,0,0)
         self.drawStimCol=(0,0,1)
-        self.drawTailLen=10
-        self.drawTailStep=10.0
+        self.drawTailLen=1.
+        self.drawTailStep=1.
         self.drawVideoFrame=True
         self.PLcode=True
 
@@ -66,13 +67,13 @@ class vidGui(object):
 
         cv2.setMouseCallback(self.window_name, self.startStop)
         cv2.createTrackbar("startFrame", self.window_name,
-                           self.settings.startFrame, 108000-6000,
+                           self.settings.startFrame, 0,
                            self.set_startFrame)
         cv2.createTrackbar("endFrame", self.window_name,
-                           self.settings.endFrame, 108000+6000,
+                           self.settings.endFrame, 1000+12000,
                            self.set_endFrame)
         cv2.createTrackbar("currFrame", self.window_name,
-                           self.settings.currFrame, 108000+3000,
+                           self.settings.currFrame, 1000+12000,
                            self.set_currFrame)
     
     def startStop(self,event, x, y, flags, param):
@@ -229,12 +230,16 @@ class vidGui(object):
 #p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'; avi_path=p+'out_id0_30fps_20170710124615.avi' #frame: 82800
 #p='D:\\data\\b\\2017\\20170921_SkypePairPermutations\\'; avi_path=p+'out_id0_30fps_20170921120214.avi'#frame 53700
 
-p='E:\\b\\medaka\\20200110_15animals_skypeAndKnot\\'; avi_path=p+'out_id0_30fps_20200110161244.avi'#frame 53700
+#p='E:\\b\\medaka\\20200110_15animals_skypeAndKnot\\'; avi_path=p+'out_id0_30fps_20200110161244.avi'#frame 
+#
+p='E:\\b\\medaka\\20200113_01_15Medaka31dpf_dn_skype\\'; avi_path=p+'out_id0_30fps_20200113093437.avi'#frame 53700
+
+
 #avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
 
 
 
-rereadTxt=1
+rereadTxt=0
 
 
 p, tail = os.path.split(avi_path)
