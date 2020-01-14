@@ -22,36 +22,37 @@ import pandas as pd
 import datetime
 import functions.CameraInterceptCorrection as cic
 
+pickFr=30*60*5*13
 class settings(object):
 
     def __init__(self, startFrame=0,
-                 endFrame=600):
+                 endFrame=pickFr+12000):
         self.startFrame=startFrame
         self.endFrame=endFrame      
-        self.currFrame=300
+        self.currFrame=pickFr
         self.run=False
         self.vidRec=False
         self.haveVid=False
         self.drawStim=True
         self.drawAn=False
-        self.drawStimPath=True
-        self.drawAnPath=True
+        self.drawStimPath=False
+        self.drawAnPath=False
         self.drawAnSize=8
-        self.drawStimSize=8
+        self.drawStimSize=4
         self.drawAnPathSize=2
         self.drawStimPathSize=2
         self.drawArenas=True
         self.drawTime=True
         self.drawAnCol=(0,0,0)
         self.drawStimCol=(0,0,1)
-        self.drawTailLen=200
-        self.drawTailStep=10.0
+        self.drawTailLen=1.
+        self.drawTailStep=1.
         self.drawVideoFrame=True
         self.PLcode=True
 
 class vidGui(object):
 
-    window_name = "vidGui"
+    window_name = "vidGUI"
     def __init__(self, path,e1,df,ROIdf,PLdf):
         self.settings=settings()
         self.df=df
@@ -61,18 +62,18 @@ class vidGui(object):
         self.path = path
         self.cap = cv2.VideoCapture(path)
         self.im=[]
-        self.rawTra=e1.rawTra.values.copy()
+        self.rawTra=e1.rawTra.values
         cv2.namedWindow(self.window_name,cv2.WINDOW_NORMAL)
 
         cv2.setMouseCallback(self.window_name, self.startStop)
         cv2.createTrackbar("startFrame", self.window_name,
-                           self.settings.startFrame, 600,
+                           self.settings.startFrame, 0,
                            self.set_startFrame)
         cv2.createTrackbar("endFrame", self.window_name,
-                           self.settings.endFrame, 600,
+                           self.settings.endFrame, pickFr+12000,
                            self.set_endFrame)
         cv2.createTrackbar("currFrame", self.window_name,
-                           self.settings.currFrame, 600,
+                           self.settings.currFrame, pickFr+12000,
                            self.set_currFrame)
     
     def startStop(self,event, x, y, flags, param):
@@ -81,7 +82,7 @@ class vidGui(object):
             while self.settings.run:
                 f=self.settings.currFrame
                 f+=1
-                key = cv2.waitKey(500) & 0xFF
+                key = cv2.waitKey(50) & 0xFF
             
                 if key == ord("x"):
                     if self.settings.haveVid:
@@ -144,7 +145,7 @@ class vidGui(object):
         else:
             self.im[:]=255
         self.im=self.im.astype('uint8')
-        fs= self.settings.currFrame-np.mod(self.settings.currFrame,5)
+        fs= self.settings.currFrame#-np.mod(self.settings.currFrame,5)
         self.currEpi=self.df['episode'].ix[np.where(self.df['epStart']>fs)[0][0]-1]
         r=np.arange(fs-self.settings.drawTailLen,fs,self.settings.drawTailStep).astype('int')
         
@@ -155,10 +156,10 @@ class vidGui(object):
             
             offset=self.ROIdf.values[ar]
             #print(ar,offset)
-            pAn=self.rawTra[:,ar*3:ar*3+2].copy()
+            pAn=self.rawTra[r,ar*3:ar*3+2]#.copy()
             xoff=offset[0]
             yoff=offset[1]
-            xx,yy=cic.deCorrectFish(pAn[:,0],pAn[:,1],xoff,yoff,xMax,53.)
+            xx,yy=cic.deCorrectFish(pAn[:,0],pAn[:,1],xoff,yoff,xMax,63.,camHeight=180)
             pAn[:,0]=xx+xoff
             pAn[:,1]=yy+yoff
             
@@ -166,20 +167,21 @@ class vidGui(object):
                 pairListNr = int(self.currEpi[:2])
                 pairList = PLdf.values[pairListNr * 16:(pairListNr + 1) * 16, ar]
             stimAn=np.where(pairList)[0][0]
-            pSt=self.rawTra[:,stimAn*3:stimAn*3+2]+offset[:2]
+
+            pSt=self.rawTra[r,stimAn*3:stimAn*3+2]+offset[:2]
             
             # draw path history 
-            for f in r:
-                opacity=250*((fs-f)/float(self.settings.drawTailLen))
+            for i,f in enumerate(r):
+                opacity=250*((fs-i)/float(self.settings.drawTailLen))
                 if self.settings.drawStimPath:
-                    center=tuple(pSt[f,:].astype('int'))
+                    center=tuple(pSt[i,:].astype('int'))
                     #print('before')
                     c=tuple(np.array([opacity if x==0 else 250. for x in self.settings.drawStimCol]))
                     #print(center,  self.settings.drawStimPathSize, c,self.settings.drawStimCol)
                     cv2.circle(self.im, center,  self.settings.drawStimPathSize, c, -1) 
                     #print('drawn')
                 if self.settings.drawAnPath:
-                    center=tuple(pAn[f,:].astype('int'))
+                    center=tuple(pAn[i,:].astype('int'))
                     c=tuple(np.array([opacity if x==0 else 250. for x in self.settings.drawAnCol]))
                     cv2.circle(self.im, center,  self.settings.drawAnPathSize, c, -1) 
                     #print('drawn2')
@@ -187,10 +189,10 @@ class vidGui(object):
     #        #DRAW Current stimulus position
             if self.settings.drawStim:
                 
-                center=tuple(pSt[f,:].astype('int'))
+                center=tuple(pSt[-1,:].astype('int'))
                 cv2.circle(self.im, center, self.settings.drawStimSize, self.settings.drawStimCol, -1)
             if self.settings.drawAn:
-                center=tuple(pAn[f,:].astype('int'))
+                center=tuple(pAn[-1,:].astype('int'))
                 cv2.circle(self.im, center, self.settings.drawAnSize, self.settings.drawAnCol, -1)            
 
     #        #DRAW DISH BOUNDARIES
@@ -229,13 +231,16 @@ class vidGui(object):
 #p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'; avi_path=p+'out_id0_30fps_20170710124615.avi' #frame: 82800
 p='D:\\data\\b\\2017\\20170921_SkypePairPermutations\\'; avi_path=p+'out_id0_30fps_20170921120214.avi'#frame 53700
 
-#p='E:\\b\\medaka\\20200110_15animals_skypeAndKnot\\'; avi_path=p+'out_id0_30fps_20200110161244.avi'#frame 53700
+#p='E:\\b\\medaka\\20200110_15animals_skypeAndKnot\\'; avi_path=p+'out_id0_30fps_20200110161244.avi'#frame
+#
+p='E:\\b\\medaka\\20200113_01_15Medaka31dpf_dn_skype\\'; avi_path=p+'out_id0_30fps_20200113093437.avi'#frame 53700
+
 
 #avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
 
 
 
-rereadTxt=1
+rereadTxt=0
 
 
 p, tail = os.path.split(avi_path)
