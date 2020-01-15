@@ -27,7 +27,8 @@ class ExperimentMeta(object):
     # ExperimentMeta class collects file paths, arena and video parameters for one experiment
     def __init__(self, expinfo):
 
-        if str(expinfo):
+        if isinstance(expinfo, str):
+            print('Experiment called with string input. Using all default parameters.')
             self.trajectoryPath = expinfo
         else:
 
@@ -687,7 +688,7 @@ class experiment(object):
         # read data for current experiment or many-dish-set
         # begin by reading first line to determine format
         #print(' ', self.expInfo.trajectoryPath, end="\r", flush=True)
-        print(' ', self.expInfo.trajectoryPath, end="")
+        print(' ','file: ', self.expInfo.trajectoryPath, end="")
         VRformat = False
         firstLine = pd.read_csv(self.expInfo.trajectoryPath,
                                 header=None,

@@ -22,7 +22,7 @@ import pandas as pd
 import datetime
 import functions.CameraInterceptCorrection as cic
 
-pickFr=30*60*5*13
+pickFr=30*60*5*5
 class settings(object):
 
     def __init__(self, startFrame=0,
@@ -229,18 +229,18 @@ class vidGui(object):
 #p='D:\\data\\b\\2017\\20170131_VR_skypeVsTrefoil\\01_skypeVsTrefoil_blackDisk002\\'
 #p='C:\\Users\\johannes\\Dropbox\\20170131_VR_skypeVsTrefoil_01\\'
 #p='C:\\Users\\johannes\\Dropbox\\20170710124615\\'; avi_path=p+'out_id0_30fps_20170710124615.avi' #frame: 82800
-p='D:\\data\\b\\2017\\20170921_SkypePairPermutations\\'; avi_path=p+'out_id0_30fps_20170921120214.avi'#frame 53700
+p#='D:\\data\\b\\2017\\20170921_SkypePairPermutations\\'; avi_path=p+'out_id0_30fps_20170921120214.avi'#frame 53700
 
 #p='E:\\b\\medaka\\20200110_15animals_skypeAndKnot\\'; avi_path=p+'out_id0_30fps_20200110161244.avi'#frame
 #
-p='E:\\b\\medaka\\20200113_01_15Medaka31dpf_dn_skype\\'; avi_path=p+'out_id0_30fps_20200113093437.avi'#frame 53700
-
+#p='E:\\b\\medaka\\20200113_01_15Medaka31dpf_dn_skype\\'; avi_path=p+'out_id0_30fps_20200113093437.avi'#frame 53700
+p='E:\\b\\medaka\\20200115_01_15Medaka33dpf_dn_skype\\'; avi_path=p+'out_id0_30fps_20200115094743.avi'
 
 #avi_path = filedialog.askopenfilename(initialdir=os.path.normpath(p))   
 
 
 
-rereadTxt=0
+rereadTxt=1
 
 
 p, tail = os.path.split(avi_path)
