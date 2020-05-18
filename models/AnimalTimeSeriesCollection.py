@@ -113,8 +113,11 @@ class AnimalTimeSeriesCollection:
         # last column in ROI file defines radius. Add 2px because the video pieces extend 2 px beyond the circle ROI.
         FocalID = self.animal.pair.animalIDs[0] # get ID of the focal animal in this pair.
         # !! This ensures that animal and stimulus are shifted by the same amount !!
-        currCenterPx = self.animal.pair.experiment.expInfo.rois[FocalID, -1] + 2
-        #currCenterPx = 0
+        if self.animal.pair.experiment.expInfo.rois:
+            currCenterPx = self.animal.pair.experiment.expInfo.rois[FocalID, -1] + 2
+        else:
+            currCenterPx = 0
+
         arenaCenterPx = np.array([currCenterPx, currCenterPx])
         x = (self.rawTra().xy-arenaCenterPx) / self.pxPmm
         return Trajectory(x)
@@ -180,7 +183,7 @@ class AnimalTimeSeriesCollection:
 
         relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor(**kwargs).xy.T)]
         relPosPolRot = np.squeeze(np.array(relPosPol).T)[:-1, :]
-        relPosPolRot[:, 0] = relPosPolRot[:, 0]-self.trackedHeading()
+        relPosPolRot[:, 0] = relPosPolRot[:, 0]-self.heading()
         x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])]
         x = np.squeeze(np.array(x).T)
         return Trajectory(x)
@@ -234,7 +237,7 @@ class AnimalTimeSeriesCollection:
     def dd_pos_pol_rot(self):
 
         x_rot = self.dd_pos_pol().xy
-        x_rot[:, 0] = x_rot[:, 0]-self.trackedHeading()[:-1]
+        x_rot[:, 0] = x_rot[:, 0]-self.heading()[:-1]
         x_rot_cart = [mu.pol2cart(x_rot[:, 0], x_rot[:, 1])]
         x_rot_cart = np.squeeze(np.array(x_rot_cart)).T
         return Trajectory(x_rot_cart)
