@@ -87,7 +87,7 @@ class AnimalTimeSeriesCollection:
 
         return np.squeeze(self.timeShift(x))
 
-    def trackedHeading_filt(self, window=61):  # Median filtered heading to avoid 180 deg jumps.
+    def trackedHeading_filt(self, window_len=61):  # Median filtered heading to avoid 180 deg jumps.
         a = self.animalIndex
         currCols = [a * 3 + 2]
         if self.animal.paired:
@@ -97,7 +97,7 @@ class AnimalTimeSeriesCollection:
         else:
             x = self.animal.experiment.rawTra.iloc[:-1, currCols]
 
-        x = medfilt(np.squeeze(self.timeShift(x)), window)
+        x = medfilt(np.squeeze(self.timeShift(x)), window_len)
         return x
 # --------------------------
 # derived time series
@@ -119,17 +119,17 @@ class AnimalTimeSeriesCollection:
         x = (self.rawTra().xy-arenaCenterPx) / self.pxPmm
         return Trajectory(x)
         
-    def position_smooth(self):
+    def position_smooth(self, window_len=5, window='hamming'):
         x = self.position().xy
-        return Trajectory(mu.smooth(x, window_len=5, window='hamming')[:-1, :])
+        return Trajectory(mu.smooth(x, window_len=window_len, window=window)[:-1, :])
         
     def positionPol(self):
         x = [mu.cart2pol(*self.position().xy.T)]
         x = np.squeeze(np.array(x).T)
         return Trajectory(x)
         
-    def d_position_Smooth(self):
-        x = np.diff(self.position_smooth().xy, axis=0)
+    def d_position_smooth(self, **kwargs):
+        x = np.diff(self.position_smooth(**kwargs).xy, axis=0)
         return Trajectory(x)
         
     def d_position(self):
@@ -137,11 +137,11 @@ class AnimalTimeSeriesCollection:
         return Trajectory(x)
         
     def dd_position(self):
-        x = np.diff(self.d_position_Smooth().xy, axis=0)
+        x = np.diff(self.d_position_smooth().xy, axis=0)
         return Trajectory(x)
         
-    def travel_smooth(self):
-        x = mu.distance(*self.d_position_Smooth().xy.T)
+    def travel_smooth(self, **kwargs):
+        x = mu.distance(*self.d_position_smooth(**kwargs).xy.T)
         return x
         
     def travel(self):
@@ -151,8 +151,8 @@ class AnimalTimeSeriesCollection:
     def speed(self):
         return self.travel() * self.fps
     
-    def speed_smooth(self):
-        return self.travel_smooth() * self.fps
+    def speed_smooth(self, **kwargs):
+        return self.travel_smooth(**kwargs) * self.fps
     
     def totalTravel(self):
         return np.nansum(np.abs(self.travel()))
@@ -160,41 +160,68 @@ class AnimalTimeSeriesCollection:
     def accel(self):
         return np.diff(self.speed_smooth())
         
-    def heading(self):  # Abandoned using this February 2019. Use trackedHeading instead!
-        return mu.cart2pol(*self.d_position_Smooth().xy.T)[0] #heading[0] = heading, heading[1] = speed
+    def heading(self, **kwargs):  # Abandoned using this February 2019. Use trackedHeading instead!
+        return mu.cart2pol(*self.d_position_smooth(**kwargs).xy.T)[0] #heading[0] = heading, heading[1] = speed
         #heading: pointing right = 0, pointung up = pi/2  
 
-    def d_heading(self):
-        return np.diff(self.heading())
+    def d_heading(self, **kwargs):
+        return np.diff(self.heading(**kwargs))
 
-    def d_trackedHeading(self):
-        return np.diff(self.trackedHeading())
+    def d_trackedHeading(self, **kwargs):
+        return np.diff(self.trackedHeading(**kwargs))
         
-    #currently, this is the position of the neighbor, relative to focal animal name is misleading...
-    def position_relative_to_neighbor(self):
-        x = self.animal.neighbor.ts.position_smooth().xy - self.position_smooth().xy
+    # currently, this is the position of the neighbor, relative to focal animal name is misleading...
+    def position_relative_to_neighbor(self, **kwargs):
+        x = self.animal.neighbor.ts.position_smooth(**kwargs).xy - self.position_smooth(**kwargs).xy
         return Trajectory(x)
         
-    #rotate self to face up in order to map neighbor position relative to self
-    def position_relative_to_neighbor_rot(self):
+    # rotate self to face up in order to map neighbor position relative to self
+    def position_relative_to_neighbor_rot(self, **kwargs):
 
-        relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor().xy.T)]
+        relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor(**kwargs).xy.T)]
         relPosPolRot = np.squeeze(np.array(relPosPol).T)[:-1, :]
         relPosPolRot[:, 0] = relPosPolRot[:, 0]-self.trackedHeading()
         x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])]
         x = np.squeeze(np.array(x).T)
         return Trajectory(x)
 
-    #rotate self to face up in order to map neighbor position relative to self
+    # rotate self to face up in order to map neighbor position relative to self, median filtered tracked heading
     def position_relative_to_neighbor_rot_filt(self, window=61):
 
         relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor().xy.T)]
         relPosPolRot = np.squeeze(np.array(relPosPol).T)[:-1, :]
-        relPosPolRot[:, 0] = relPosPolRot[:, 0]-self.trackedHeading_filt(window=window)
+        heading = self.trackedHeading_filt(window_len=window)
+        if relPosPolRot.shape[0] > heading.shape[0]:
+
+            relPosPolRot = relPosPolRot[:heading.shape[0], :]
+
+        elif relPosPolRot.shape[0] < heading.shape[0]:
+
+            heading = heading[:relPosPolRot.shape[0], :]
+        relPosPolRot[:, 0] = relPosPolRot[:, 0] - heading
         x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])]
         x = np.squeeze(np.array(x).T)
         return Trajectory(x)
 
+    # rotate self to face up in order to map neighbor position relative to self with post-hoc heading
+    # xy positions are only strongly smoothed for heading calculation, not for relative position (see kwargs)
+    def position_relative_to_neighbor_rot_alt(self, **kwargs):
+
+        relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor().xy.T)]
+        relPosPolRot = np.squeeze(np.array(relPosPol).T)[:-1, :]
+        heading = self.heading(**kwargs)
+        if relPosPolRot.shape[0] > heading.shape[0]:
+
+            relPosPolRot = relPosPolRot[:heading.shape[0], :]
+
+        elif relPosPolRot.shape[0] < heading.shape[0]:
+
+            heading = heading[:relPosPolRot.shape[0], :]
+
+        relPosPolRot[:, 0] = relPosPolRot[:, 0] - heading + np.pi/2
+        x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])]
+        x = np.squeeze(np.array(x).T)
+        return Trajectory(x)
 
     #acceleration using rotation corrected data
     #effectively splits acceleration into speeding [0] and turning [1]
@@ -212,10 +239,19 @@ class AnimalTimeSeriesCollection:
         x_rot_cart = np.squeeze(np.array(x_rot_cart)).T
         return Trajectory(x_rot_cart)
     
-    def dd_pos_pol_rot_filt(self, window=61):
+    def dd_pos_pol_rot_filt(self, **kwargs):
 
         x_rot = self.dd_pos_pol().xy
-        x_rot[:, 0] = x_rot[:, 0]-self.trackedHeading_filt(window=window)[:-1]
+        heading = self.heading(**kwargs)
+        if x_rot.shape[0] > heading.shape[0]:
+
+            x_rot = x_rot[:heading.shape[0]]
+
+        elif x_rot.shape[0] < heading.shape[0]:
+
+            heading = heading[:x_rot.shape[0]]
+
+        x_rot[:, 0] = x_rot[:, 0] - heading
         x_rot_cart = [mu.pol2cart(x_rot[:, 0], x_rot[:, 1])]
         x_rot_cart = np.squeeze(np.array(x_rot_cart)).T
         return Trajectory(x_rot_cart)
@@ -232,10 +268,10 @@ class AnimalTimeSeriesCollection:
                                      normed=True)[0]*neighborMat.shape[0]**2
         return neighborMat
 
-    def neighborMat_filt(self, window=61):
+    def neighborMat_filt(self, **kwargs):
         mapBins = self.mapBins
         neighborMat = np.zeros([62, 62])
-        pos = self.position_relative_to_neighbor_rot_filt(window=window).xy
+        pos = self.position_relative_to_neighbor_rot_alt(**kwargs).xy
         pos = pos[~np.isnan(pos).any(axis=1), :]
         neighborMat = np.histogramdd(pos,
                                      bins=[mapBins, mapBins],
@@ -278,23 +314,23 @@ class AnimalTimeSeriesCollection:
                                        bins=[mapBins, mapBins])[0]
 
     # speed - using only acceleration component aligned with heading
-    def ForceMat_speed_filt(self, window=61):
+    def ForceMat_speed_filt(self, **kwargs):
 
         mapBins = self.mapBins
-        position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot_filt(window=window)
+        position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot_alt(**kwargs)
         return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                        position_relative_to_neighbor_rot.y()[1:],
-                                       self.dd_pos_pol_rot_filt(window=window).xy[:, 0],
+                                       self.dd_pos_pol_rot_filt(**kwargs).xy[:, 0],
                                        bins=[mapBins, mapBins])[0]
 
     #turn - using only acceleration component perpendicular to heading
-    def ForceMat_turn_filt(self, window=61):
+    def ForceMat_turn_filt(self, **kwargs):
 
         mapBins = self.mapBins
-        position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot_filt(window=window)
+        position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot_alt(**kwargs)
         return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                        position_relative_to_neighbor_rot.y()[1:],
-                                       self.dd_pos_pol_rot_filt(window=window).xy[:, 1],
+                                       self.dd_pos_pol_rot_filt(**kwargs).xy[:, 1],
                                        bins=[mapBins, mapBins])[0]
 
     #percentage of time the neighbor animal was in front vs. behind focal animal
