@@ -113,7 +113,7 @@ class AnimalTimeSeriesCollection:
         # last column in ROI file defines radius. Add 2px because the video pieces extend 2 px beyond the circle ROI.
         FocalID = self.animal.pair.animalIDs[0] # get ID of the focal animal in this pair.
         # !! This ensures that animal and stimulus are shifted by the same amount !!
-        if self.animal.pair.experiment.expInfo.rois:
+        if not (self.animal.pair.experiment.expInfo.rois is None):
             currCenterPx = self.animal.pair.experiment.expInfo.rois[FocalID, -1] + 2
         else:
             currCenterPx = 0
