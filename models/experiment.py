@@ -26,6 +26,7 @@ import random
 class ExperimentMeta(object):
     # ExperimentMeta class collects file paths, arena and video parameters for one experiment
     def __init__(self, expinfo):
+        self.readLim = None
 
         if isinstance(expinfo, str):
             print('Experiment called with string input. Using all default parameters.')
@@ -81,7 +82,7 @@ class ExperimentMeta(object):
         self.numFrames = None
         self.fps = None
         self.pxPmm = None
-        self.readLim = None
+
         self.filteredMaps = None
 
 
@@ -517,6 +518,7 @@ class experiment(object):
 
                 if np.unique(blockEpisodes).shape[0] > 1:
                     print(np.unique(self.episodeAll))
+                    print(offset,rng)
                     offset = offset + np.where(np.abs(np.diff(blockEpisodes)) > 0)[0][0]+1
                     print('episode transition detected at episode: ', i, '. applying offset: ', offset)
                     rng = np.array([offset + (i * episodeFrames), offset + ((i + 1) * episodeFrames)]).astype('int')
