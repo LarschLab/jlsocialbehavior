@@ -38,7 +38,8 @@ def getAnimalSizeFromVideo(currAvi,rawData,camHeight, sizePercentile=40,numPairs
             yy=rawTra[:,1]
             xoff=rois[i,0]
             yoff=rois[i,1]
-            xx,yy=cic.deCorrectFish(xx,yy,xoff,yoff,xMax,yMax,camHeight)
+            if camHeight > 0:
+                xx,yy=cic.deCorrectFish(xx,yy,xoff,yoff,xMax,yMax,camHeight)
             tra[:,0]=xx+xoff
             tra[:,1]=yy+yoff
             traAll[:,i,:]=tra[frames,:].copy()           
