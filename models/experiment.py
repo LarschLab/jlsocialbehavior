@@ -2,6 +2,8 @@ import numpy as np
 import os
 import datetime
 import glob
+
+import functions.getVideoProperties
 import functions.plotFunctions_joh as johPlt
 import functions.randomDotsOnCircle as randSpacing
 import functions.video_functions as vf
@@ -179,7 +181,7 @@ class ExperimentMeta(object):
         # If a video file name is passed, collect video parameters
         if self.aviPath:
             # get video meta data
-            vp = vf.getVideoProperties(self.aviPath)  # video properties
+            vp = functions.getVideoProperties.getVideoProperties(self.aviPath)  # video properties
             # self.ffmpeginfo = vp
             self.videoDims = [int(vp['width']), int(vp['height'])]
             self.numFrames = int(vp['nb_frames'])

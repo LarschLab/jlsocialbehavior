@@ -4,6 +4,8 @@ import cv2
 import tkFileDialog
 import wx
 import os
+
+import functions.getVideoProperties
 import functions.video_functions as vf
 import time
 import pickle
@@ -20,7 +22,7 @@ class UnTileArenaVideo(object):
         
         self.avi_path=avi_path
         head, tail = os.path.split(self.avi_path)
-        vp=vf.getVideoProperties(avi_path)
+        vp= functions.getVideoProperties.getVideoProperties(avi_path)
         self.ffmpeginfo = vp
         self.videoDims = [vp['width'] , vp['height']]
         self.numFrames=int(vp['nb_frames'])
