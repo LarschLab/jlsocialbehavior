@@ -124,13 +124,13 @@ def smooth(x,window_len=11,window='hanning'):
 
     if x.ndim == 1:
         s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
-        yAll=np.convolve(w/w.sum(),s,mode='valid')[int((window_len/2-1)):-int(window_len/2)]
+        yAll=np.convolve(w/w.sum(),s,mode='valid')[int(round(window_len/2-1, 0)):-int(round(window_len/2, 0))]
         
     if x.ndim == 2:
         y=[]
         for c in range(x.shape[1]):
             s=np.r_[x[window_len-1:0:-1,c],x[:,c],x[-2:-window_len-1:-1,c]]
-            y.append(np.convolve(w/w.sum(),s,mode='valid')[int(window_len/2-1):-int(window_len/2)])
+            y.append(np.convolve(w/w.sum(),s,mode='valid')[int(round(window_len/2-1, 0)):-int(round(window_len/2, 0))])
         yAll=np.array(y).T
     
     return yAll

@@ -42,6 +42,7 @@ class gui_circles(object):
         self.fig = plt.figure(figsize=(15,9))
         self.ax = self.fig.add_subplot(111)
         self.out_file=out_file
+        self.rois = np.array([])
         xaxis = self.frame.shape[1]
         yaxis = self.frame.shape[0]
         

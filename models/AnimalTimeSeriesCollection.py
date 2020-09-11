@@ -30,7 +30,6 @@ from scipy.signal import medfilt
 class AnimalTimeSeriesCollection:
     def __init__(self):
         self.animalIndex = None
-        self.mapBins = np.arange(-31, 32)
         self.pxPmm = None
         self.fps = None
     
@@ -113,7 +112,7 @@ class AnimalTimeSeriesCollection:
         # last column in ROI file defines radius. Add 2px because the video pieces extend 2 px beyond the circle ROI.
         FocalID = self.animal.pair.animalIDs[0] # get ID of the focal animal in this pair.
         # !! This ensures that animal and stimulus are shifted by the same amount !!
-        if self.animal.pair.experiment.expInfo.rois:
+        if self.animal.pair.experiment.expInfo.rois.shape[0] != 0:
             currCenterPx = self.animal.pair.experiment.expInfo.rois[FocalID, -1] + 2
         else:
             currCenterPx = 0
@@ -262,7 +261,7 @@ class AnimalTimeSeriesCollection:
     #creates the neighbormat for current animal (where neighbor was)
     #this map seems flipped both horizontally and vertically! vertical is corrected at plotting.
     def neighborMat(self):
-        mapBins = self.mapBins
+        mapBins = self.animal.pair.experiment.mapBins
         neighborMat = np.zeros([62, 62])
         pos = self.position_relative_to_neighbor_rot().xy
         pos = pos[~np.isnan(pos).any(axis=1), :]
@@ -272,7 +271,7 @@ class AnimalTimeSeriesCollection:
         return neighborMat
 
     def neighborMat_filt(self, **kwargs):
-        mapBins = self.mapBins
+        mapBins = self.animal.pair.experiment.mapBins
         neighborMat = np.zeros([62, 62])
         pos = self.position_relative_to_neighbor_rot_alt(**kwargs).xy
         pos = pos[~np.isnan(pos).any(axis=1), :]
@@ -290,7 +289,7 @@ class AnimalTimeSeriesCollection:
         
     #speedAndTurn - using total acceleration
     def ForceMat_speedAndTurn(self):
-        mapBins = self.mapBins
+        mapBins = self.animal.pair.experiment.mapBins
         position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot()
         ForceMat = sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                            position_relative_to_neighbor_rot.y()[1:],
@@ -300,7 +299,7 @@ class AnimalTimeSeriesCollection:
         
     #speed - using only acceleration component aligned with heading
     def ForceMat_speed(self):
-        mapBins = self.mapBins
+        mapBins = self.animal.pair.experiment.mapBins
         position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot()
         return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                        position_relative_to_neighbor_rot.y()[1:],
@@ -309,7 +308,7 @@ class AnimalTimeSeriesCollection:
 
     #turn - using only acceleration component perpendicular to heading
     def ForceMat_turn(self):
-        mapBins = self.mapBins
+        mapBins = self.animal.pair.experiment.mapBins
         position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot()
         return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                        position_relative_to_neighbor_rot.y()[1:],
@@ -319,7 +318,7 @@ class AnimalTimeSeriesCollection:
     # speed - using only acceleration component aligned with heading
     def ForceMat_speed_filt(self, **kwargs):
 
-        mapBins = self.mapBins
+        mapBins = self.animal.pair.experiment.mapBins
         position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot_alt(**kwargs)
         return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                        position_relative_to_neighbor_rot.y()[1:],
@@ -329,7 +328,7 @@ class AnimalTimeSeriesCollection:
     #turn - using only acceleration component perpendicular to heading
     def ForceMat_turn_filt(self, **kwargs):
 
-        mapBins = self.mapBins
+        mapBins = self.animal.pair.experiment.mapBins
         position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot_alt(**kwargs)
         return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                        position_relative_to_neighbor_rot.y()[1:],

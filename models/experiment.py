@@ -380,6 +380,7 @@ class experiment(object):
         self.animals = []
         self.shiftList = None   # fix list for 'random' shifts for time shift control data.
         self.pair2animal = []
+        self.mapBins = np.linspace(-20, 20, 31)
 
         # imitate overload behavior
         if type(expDef) == pd.Series:       # typically, run with a pandas df row of arguments
@@ -624,7 +625,7 @@ class experiment(object):
 
         if self.expInfo.SaveNeighborhoodMaps:
             numepiAll = self.expInfo.episodes * self.expInfo.numPairs
-            nmAll = np.zeros((numepiAll, 3, 2, 62, 62))  # animal,[neighbor,speed,turn, neighbor filt,speed filt,turn filt],[data,shuffle0],[mapDims]
+            nmAll = np.zeros((numepiAll, 3, 2, self.mapBins.shape[0]-1, self.mapBins.shape[0]-1))  # animal,[neighbor,speed,turn, neighbor filt,speed filt,turn filt],[data,shuffle0],[mapDims]
             #print('Computing neighborhood maps... ', end="\r", flush=True)
             print('Computing neighborhood maps... ', end="")
             for i in range(numepiAll):
