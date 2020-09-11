@@ -2,6 +2,8 @@ import numpy as np
 import os
 import datetime
 import glob
+
+import functions.getVideoProperties
 import functions.plotFunctions_joh as johPlt
 import functions.randomDotsOnCircle as randSpacing
 import functions.video_functions as vf
@@ -26,13 +28,32 @@ import random
 class ExperimentMeta(object):
     # ExperimentMeta class collects file paths, arena and video parameters for one experiment
     def __init__(self, expinfo):
-        trajectoryPath = expinfo['txtPath']
-        self.trajectoryPathAll = np.array(trajectoryPath.split())
-        self.trajectoryFileNum = self.trajectoryPathAll.shape[0]
-        if self.trajectoryFileNum > 1:
-            self.trajectoryPath = self.trajectoryPathAll[0]
+        self.readLim = None
+
+        if isinstance(expinfo, str):
+            print('Experiment called with string input. Using all default parameters.')
+            self.trajectoryPath = expinfo
         else:
-            self.trajectoryPath = trajectoryPath
+
+            trajectoryPath = expinfo['txtPath']
+            self.trajectoryPathAll = np.array(trajectoryPath.split())
+            self.trajectoryFileNum = self.trajectoryPathAll.shape[0]
+            if self.trajectoryFileNum > 1:
+                self.trajectoryPath = self.trajectoryPathAll[0]
+            else:
+                self.trajectoryPath = trajectoryPath
+
+            try:
+                num_lines = sum(1 for line in open(self.trajectoryPath))
+                self.readLim = np.min([expinfo['readLim'], num_lines])
+                print('readLim: ' + str(self.readLim))
+            except KeyError:
+                print('readLim not specified. Using all data (default).')
+                self.readLim = None
+            except:
+                print('Could not determine readLim at this point. Using all data (default).')
+                self.readLim = None
+
 
         self.aviPath = None
         self.aspPath = None
@@ -67,16 +88,10 @@ class ExperimentMeta(object):
         self.numFrames = None
         self.fps = None
         self.pxPmm = None
-        self.readLim = None
+
         self.filteredMaps = None
 
-        try:
-            num_lines = sum(1 for line in open(self.trajectoryPath))
-            self.readLim = np.min([expinfo['readLim'], num_lines])
-            print('readLim: ' + str(self.readLim))
-        except KeyError:
-            print('readLim not specified. Using all data (default).')
-            self.readLim = None
+
 
         #Parse arguments from expinfo or use defaults with a notification.
 
@@ -166,7 +181,7 @@ class ExperimentMeta(object):
         # If a video file name is passed, collect video parameters
         if self.aviPath:
             # get video meta data
-            vp = vf.getVideoProperties(self.aviPath)  # video properties
+            vp = functions.getVideoProperties.getVideoProperties(self.aviPath)  # video properties
             # self.ffmpeginfo = vp
             self.videoDims = [int(vp['width']), int(vp['height'])]
             self.numFrames = int(vp['nb_frames'])
@@ -469,17 +484,17 @@ class experiment(object):
         else:
             pairList = self.expInfo.pairListAll
 
-        for p in range(self.expInfo.numPairs):
+            for p in range(self.expInfo.numPairs):
 
-            currPartnerAll = np.where(pairList[:, p])[0]
+                currPartnerAll = np.where(pairList[:, p])[0]
 
-            for mp in range(currPartnerAll.shape[0]):
-                currPartner = currPartnerAll[mp]
-                Pair(shift=[0,0],
-                     animalIDs=[p, currPartner],
-                     epiNr=0,
-                     rng=[0, self.expInfo.numFrames],
-                     fullAn=True).joinExperiment(self)
+                for mp in range(currPartnerAll.shape[0]):
+                    currPartner = currPartnerAll[mp]
+                    Pair(shift=[0,0],
+                         animalIDs=[p, currPartner],
+                         epiNr=0,
+                         rng=[0, self.expInfo.numFrames],
+                         fullAn=True).joinExperiment(self)
 
     def splitToPairs(self):
         # Split raw data table into animal-pair-episodes
@@ -510,6 +525,7 @@ class experiment(object):
 
                 if np.unique(blockEpisodes).shape[0] > 1:
                     print(np.unique(self.episodeAll))
+                    print(offset,rng)
                     offset = offset + np.where(np.abs(np.diff(blockEpisodes)) > 0)[0][0]+1
                     print('episode transition detected at episode: ', i, '. applying offset: ', offset)
                     rng = np.array([offset + (i * episodeFrames), offset + ((i + 1) * episodeFrames)]).astype('int')
@@ -682,60 +698,69 @@ class experiment(object):
         # read data for current experiment or many-dish-set
         # begin by reading first line to determine format
         #print(' ', self.expInfo.trajectoryPath, end="\r", flush=True)
-        print(' ', self.expInfo.trajectoryPath, end="")
+        print(' ','file: ', self.expInfo.trajectoryPath, end="")
         VRformat = False
-        firstLine = pd.read_csv(self.expInfo.trajectoryPath,
-                                header=None,
-                                nrows=1,
-                                sep=':')
-
-        if firstLine.values[0][0][0] == '(':
-            rawData = pd.read_csv(self.expInfo.trajectoryPath,
-                                  sep=',|\)|\(',
-                                  engine='python',
-                                  index_col=None,
-                                  header=None,
-                                  skipfooter=1,
-                                  usecols=[2, 3, 6, 7, 10],
-                                  names=np.arange(5))
-            episodeAll = rawData[4]
-            rawData=rawData.drop(rawData.columns[[4]], axis=1).astype(float)
-            rawData.insert(loc=2,column='o1',value=0)
-            rawData.insert(loc=5, column='o2', value=0)
-            print('old bonsai format detected')
-            # rawData= mat.reshape((mat.shape[0],2,2))
-
-        elif firstLine.values[0][0][0] == 'X':
-            rawData = pd.read_csv(self.expInfo.trajectoryPath,
-                                  header=None,
-                                  delim_whitespace=True,
-                                  skiprows=1)
-            print('found idTracker csv')
+        if self.expInfo.trajectoryPath[-3:]=='npy':
+            #idtrackerai output
+            raw=np.load(self.expInfo.trajectoryPath)
+            tmp = np.dstack([raw, np.zeros((raw.shape[:2]))])
+            tmp = tmp.reshape((tmp.shape[0], 3 * raw.shape[1]))
+            rawData=pd.DataFrame(tmp)
             episodeAll = np.zeros(rawData.shape[0])
-            #episodeAll = pd.DataFrame(np.zeros(rawData.shape[0]))
+        else:
+            firstLine = pd.read_csv(self.expInfo.trajectoryPath,
+                                    header=None,
+                                    nrows=1,
+                                    sep=':')
 
-        else:  # default for all bonsai VR experiments since mid 2017
-            VRformat = True
-            rawData = pd.read_csv(self.expInfo.trajectoryPath,
-                                  header=None,
-                                  delim_whitespace=True,
-                                  nrows=self.expInfo.readLim)
-            print('VRtrack: '+self.expInfo.trajectoryPath + str(self.expInfo.readLim))
-            episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
+            if firstLine.values[0][0][0] == '(':
+                rawData = pd.read_csv(self.expInfo.trajectoryPath,
+                                      sep=',|\)|\(',
+                                      engine='python',
+                                      index_col=None,
+                                      header=None,
+                                      skipfooter=1,
+                                      usecols=[2, 3, 6, 7, 10],
+                                      names=np.arange(5))
+                episodeAll = rawData[4]
+                rawData=rawData.drop(rawData.columns[[4]], axis=1).astype(float)
+                rawData.insert(loc=2,column='o1',value=0)
+                rawData.insert(loc=5, column='o2', value=0)
+                print('old bonsai format detected')
+                # rawData= mat.reshape((mat.shape[0],2,2))
 
-        if (self.expInfo.trajectoryFileNum > 1) and VRformat:
-            print('More than one trajectory file, loading all:', end='\r')
-            fnCombinedData = self.expInfo.trajectoryPathAll[-1][:-7]+'all'+'.h5'
-            if np.equal(~os.path.isfile(fnCombinedData), -1):
-                self.batchToHdf(fnCombinedData)
+            elif firstLine.values[0][0][0] == 'X':
+                rawData = pd.read_csv(self.expInfo.trajectoryPath,
+                                      header=None,
+                                      delim_whitespace=True,
+                                      skiprows=1)
+                print('found idTracker csv')
+                episodeAll = np.zeros(rawData.shape[0])
+                #episodeAll = pd.DataFrame(np.zeros(rawData.shape[0]))
 
-            print(' Reading combined data.')
-            hdf = pd.HDFStore(fnCombinedData)
-            rawData = hdf['rawData']
-            rawData = rawData.reset_index().drop('index', axis=1)
-            # pd.read_csv(fnCombinedData, header=None, delim_whitespace=True)
-            hdf.close()
-            episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
+            else:  # default for all bonsai VR experiments since mid 2017
+                VRformat = True
+                rawData = pd.read_csv(self.expInfo.trajectoryPath,
+                                      header=None,
+                                      delim_whitespace=True,
+                                      nrows=self.expInfo.readLim)
+                print('VRtrack: '+self.expInfo.trajectoryPath + str(self.expInfo.readLim))
+                episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
+
+            if (str(self.expInfo) is False) and (self.expInfo.trajectoryFileNum > 1) and VRformat:
+                print('More than one trajectory file, loading all:', end='\r')
+                fnCombinedData = self.expInfo.trajectoryPathAll[-1][:-7]+'all'+'.h5'
+                if np.equal(~os.path.isfile(fnCombinedData), -1):
+                    self.batchToHdf(fnCombinedData)
+
+                print(' Reading combined data.')
+                hdf = pd.HDFStore(fnCombinedData)
+                rawData = hdf['rawData']
+                rawData = rawData.reset_index().drop('index', axis=1)
+                # pd.read_csv(fnCombinedData, header=None, delim_whitespace=True)
+                hdf.close()
+                episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
+
         return rawData, episodeAll
 
     def batchToHdf(self, fnCombinedData):

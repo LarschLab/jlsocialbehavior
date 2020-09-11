@@ -14,7 +14,8 @@ force_input=0: can set to one to ask user for input even if csv file already exi
 @author: johannes
 """
 
-
+import matplotlib
+matplotlib.use('WXAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,9 +24,14 @@ import wx
 import os
 import warnings
 
+
+from functions.getMedVideo import getMedVideo
+import tkinter as tk
+from tkinter import filedialog
+
 #disable deprecation warning caused by self.fig.canvas.stop_event_loop()
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore",category=DeprecationWarning)
+#with warnings.catch_warnings():
+#    warnings.filterwarnings("ignore",category=DeprecationWarning)
 
 #this function returns the ROI list as pandas df and the file name to stored csv
 def get_circle_rois(img_file,output_file_suffix='',force_input=0):
@@ -36,15 +42,23 @@ def get_circle_rois(img_file,output_file_suffix='',force_input=0):
 
 #create a GUI that shows the image, asks how many circles to draw and what the diameter of an arena is   
 class gui_circles(object):
-    def __init__(self,img_file,out_file,force_input=0):
+    def __init__(self,img_file=None,out_file=None,force_input=0):
 
-        self.frame = cv2.imread(img_file)
-        self.fig = plt.figure(figsize=(15,9))
-        self.ax = self.fig.add_subplot(111)
-        self.out_file=out_file
-        self.rois = np.array([])
-        xaxis = self.frame.shape[1]
-        yaxis = self.frame.shape[0]
+        if img_file == None:
+            root = tk.Tk()
+            root.withdraw()
+            img_file = filedialog.askopenfilename()
+
+            if img_file[-3:]=='avi':
+                print('recomputing background image from video for ROI selection...')
+                img_file= getMedVideo(img_file)[1]
+
+        if out_file == None:
+            head, tail = os.path.split(img_file)
+            out_file = head + '//ROIdefManual.csv'
+            print(out_file)
+
+
         
         #use WX to query user for number of arenas and arena diameter
         #ask() is a utility function to query user
@@ -59,16 +73,29 @@ class gui_circles(object):
         if ~np.equal(~os.path.isfile(out_file),-2) or force_input:
             
 
-            self.im = self.ax.imshow(self.frame[::-1,:], cmap='gray', extent=(0,xaxis,0,yaxis), picker=5)
-            self.fig.canvas.draw()
+
             # Initialize wx App
             app = wx.App()
+            # Then a frame.
             app.MainLoop()
     
             # Call Dialog
             self.numCircles = np.int(ask(message = 'How Many Arenas?'))
             self.ArenaDiameter = np.int(ask(message = 'Arena diameter in mm ?'))
-            
+
+
+            self.frame = cv2.imread(img_file)
+            self.fig = plt.figure(figsize=(15, 9))
+            self.ax = self.fig.add_subplot(111)
+            self.out_file = out_file
+            xaxis = self.frame.shape[1]
+            yaxis = self.frame.shape[0]
+
+            self.im = self.ax.imshow(self.frame[::-1,:], cmap='gray', extent=(0,xaxis,0,yaxis), picker=5,origin='upper')
+            print('imshow')
+            self.fig.canvas.draw()
+            print('draw')
+
             self.ClickCount=0 #counter for points that belong to one circle
             
             #set onpick1() as callback for mouse click events
@@ -85,6 +112,7 @@ class gui_circles(object):
             
         #if output file exists, read ROIs from file
         else:
+            print('ROIs already defined')
             self.rois=pd.read_csv(out_file,header=0,index_col=0,sep=',')
             self.roiAll=self.rois.ix[:,0:3].values
             self.roiSq=self.rois.ix[:,3:7].values
@@ -114,7 +142,7 @@ class gui_circles(object):
                 event.canvas.figure.gca().add_artist(circle)
                 event.canvas.draw()
                 self.CirclesDone +=1
-                #print self.CirclesDone
+                print(self.CirclesDone)
                 self.roiAll.append(roi)
                 codecRound=16
                 largest_square=np.min([self.frame.shape[0:1]-roi[0:1]-4,roi[0:1]])*2

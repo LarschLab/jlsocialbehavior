@@ -6,11 +6,13 @@ Created on Tue May 22 12:40:52 2018
 """
 import numpy as np
 import os
+
+import functions.getVideoProperties
 import functions.video_functions as vf
 import functions.CameraInterceptCorrection as cic
 
 def getAnimalSizeFromVideo(currAvi,rawData,camHeight, sizePercentile=40,numPairs=15, roiPath=[]):
-    videoInfo = vf.getVideoProperties(currAvi)
+    videoInfo = functions.getVideoProperties.getVideoProperties(currAvi)
     xMax = int(videoInfo['width']) #relevant for openGL scaling
     yMax = int(videoInfo['height'])
 
@@ -38,7 +40,8 @@ def getAnimalSizeFromVideo(currAvi,rawData,camHeight, sizePercentile=40,numPairs
             yy=rawTra[:,1]
             xoff=rois[i,0]
             yoff=rois[i,1]
-            xx,yy=cic.deCorrectFish(xx,yy,xoff,yoff,xMax,yMax,camHeight)
+            if camHeight > 0:
+                xx,yy=cic.deCorrectFish(xx,yy,xoff,yoff,xMax,yMax,camHeight)
             tra[:,0]=xx+xoff
             tra[:,1]=yy+yoff
             traAll[:,i,:]=tra[frames,:].copy()           
