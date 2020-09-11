@@ -53,7 +53,7 @@ def groupCohen(x, cat='wt'):
 
 def groupPower(x, cat='wt'):
     dat = x.groupby(['animalIndex', cat]).si.mean().unstack().reset_index()
-    names = ['mnA', 'mnB', 'mnDiff', 'p', 'es', 'P', 'nA', 'nB', 'esReal', 'sPooled', 'sensitivity']
+    names = ['mnA', 'mnB', 'mnDiff', 'p', 'es', 'P', 'nA', 'nB', 'esReal', 'sPooled', 'sensitivity','s1','s2']
     catLevels = x[cat].unique()
     catLevels.sort()
     # if dat.shape[1] > 2:
@@ -69,6 +69,7 @@ def groupPower(x, cat='wt'):
         effectSizeReal = cohend(a, b)
         n1, n2 = len(a), len(b)
         s1, s2 = np.var(a, ddof=1), np.var(b, ddof=1)
+        sd1,sd2 = np.std(a),np.std(b)
         s = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
 
         P = sms.TTestIndPower().solve_power(effectSize, power=None, alpha=0.05, ratio=r, nobs1=nobs1)
@@ -85,7 +86,9 @@ def groupPower(x, cat='wt'):
                           len(b),
                           effectSizeReal,
                           s,
-                          sens], index=names)
+                          sens,
+                          sd1,
+                          sd2], index=names)
     else:
         return pd.Series(np.zeros(len(names)) * np.nan, index=names)
 
@@ -181,3 +184,18 @@ def speedFft(data):
     idx = np.argsort(freqs)
     ps = np.abs(np.fft.fft(tmp))**2
     return freqs[idx],ps[idx]
+
+def powerToSample(df):
+    result=[]
+    for i,r in df.iterrows():
+        text="%s,%s,%s,%s,%s,%s,%s"%(
+            str(i),
+            '{:3.3f}'.format(r.mnA),
+            '{:3.3f}'.format(r.s1),
+            '{:3.3f}'.format(r.nA),
+            '{:3.3f}'.format(r.mnB),
+            '{:3.3f}'.format(r.s2),
+            '{:3.3f}'.format(r.nB),
+        )
+        result.append(text)
+    return result
