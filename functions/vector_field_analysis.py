@@ -270,6 +270,229 @@ def generate_bout_df(
     return bout_df
 
 
+def generate_attraction_df(
+
+    expset_names,
+    stim_protocols
+):
+    for expset_name, stim_protocol in zip(expset_names, stim_protocols):
+        exp_set, limit, frames_ep, n_animals_sess, df = read_experiment_set(
+
+            expset_name=expset_name,
+            stim_protocol=stim_protocol
+
+        )
+        pickle.dump(exp_set, open('exp_set_{}.p'.format(expset_name), 'wb'))
+        pickle.dump(df, open('df_{}.p'.format(expset_name), 'wb'))
+
+    return
+
+
+def calc_ansess(df):
+
+    n_animals = df.animalIndex.unique().shape[0]
+
+    dates_ids = np.unique([(date.split(' ')[0], anid)
+                           for date, anid in zip(df['time'].values, df['animalID'].values)], axis=0)
+
+    n_animals_sess = [dates_ids[np.where(dates_ids[:, 0] == date)[0], 1].astype(int).max() + 1
+                      for date in np.unique(dates_ids[:, 0])]
+
+    return n_animals, dates_ids, n_animals_sess
+
+
+def load_mapdata(
+
+    expset_names,
+    exclude_animals,
+    datapath='C:/Users/jkappel/J-sq'
+):
+    """
+
+    :param expset_names:
+    :param exclude_animals:
+    :param datapath:
+    :return:
+    """
+    map_paths = []
+    dfs = [pickle.load(open(i, 'rb')) for i in glob.glob(datapath + '/df*.p')]
+    for i, dataset in enumerate(expset_names):
+
+        map_paths.extend(glob.glob(datapath + '/' + dataset + '/*MapData.npy'))
+        print(map_paths)
+
+        if i + 1 < len(expset_names):
+            maxset = dfs[i]['animalSet'].max()
+            maxfidx = dfs[i]['animalIndex'].max()
+            dfs[i].loc[dfs[i].group == 'ctr', 'group'] = 'wt'
+            dfs[i + 1]['animalSet'] += maxset + 1  # + 1 because 0-indexed
+            dfs[i + 1]['animalIndex'] += maxfidx
+            exclude_animals[i + 1] += maxfidx
+        print(dfs[i].animalIndex.unique().shape, dfs[i].animalIndex.unique())
+
+    df_merged = pd.concat(dfs, ignore_index=False)
+    exan = [idx for key in sorted(exclude_animals.keys()) for idx in exclude_animals[key]]
+    return df_merged, exan, map_paths
+
+
+def extract_nmaps(
+
+    df,
+    map_paths,
+    analysisstart=0,
+    analysisend=300
+):
+
+    """
+    :param df:
+    :param map_paths:
+    :return:
+
+    """
+    #Extracting FILTERED neighborhood maps from each individual animal for all conditions
+    n_animals, dates_ids, n_animals_sess = calc_ansess(df)
+    neighbormaps_bl = np.zeros((n_animals, 30, 30)) * np.nan
+    neighbormaps_cont = np.zeros((n_animals, 30, 30)) * np.nan
+
+    for nmap, stimtype in zip([neighbormaps_bl, neighbormaps_cont], ['10k20f', '07k01f']):
+
+        for mapno in range(len(map_paths)):
+
+            print(map_paths[mapno])
+            tmp = np.load(map_paths[mapno])
+            print(tmp.shape, mapno)
+            tmpDf = df[df.animalSet == mapno]
+            for a in range(n_animals_sess[mapno]):
+                an = sum(n_animals_sess[:mapno]) + a
+                print(an)
+                dfIdx = (tmpDf.episode == stimtype) & \
+                        (tmpDf.animalID == a) & \
+                        (tmpDf.inDishTime > analysisstart) & \
+                        (tmpDf.inDishTime < analysisend)
+                ix = np.where(dfIdx)[0]
+                nmap[an, :, :] = np.nanmean(tmp[ix, 0, 0, :, :], axis=0)
+
+
+    #Extracting SHIFTED FILTERED neighborhood maps from each individual animal for all conditions
+    sh_neighbormaps_bl = np.zeros((n_animals, 30, 30)) * np.nan
+    sh_neighbormaps_cont = np.zeros((n_animals, 30, 30)) * np.nan
+
+    for nmap, stimtype in zip([sh_neighbormaps_bl, sh_neighbormaps_cont], ['10k20f', '07k01f']):
+
+        for mapno in range(len(map_paths)):
+
+            print(map_paths[mapno])
+            tmp = np.load(map_paths[mapno])
+            print(tmp.shape)
+            tmpDf = df[df.animalSet == mapno]
+            for a in range(n_animals_sess[mapno]):
+                an = sum(n_animals_sess[:mapno]) + a
+
+                dfIdx = (tmpDf.episode == stimtype) & \
+                        (tmpDf.animalID == a) & \
+                        (tmpDf.inDishTime > analysisstart) & \
+                        (tmpDf.inDishTime < analysisend)
+                ix = np.where(dfIdx)[0]
+
+                nmap[an, :, :] = np.nanmean(tmp[ix, 0, 1, :, :], axis=0)
+
+    return neighbormaps_bl, neighbormaps_cont, sh_neighbormaps_bl, sh_neighbormaps_cont
+
+
+def generate_mapdict(
+
+    df_merged,
+    neighbormaps_bl,
+    neighbormaps_cont,
+    expset_names,
+    exclude_animals,
+    datapath='J:/_Projects/J-sq'
+):
+    from collections import defaultdict as ddict
+    mapdict = {}
+    exan = [idx for key in sorted(exclude_animals.keys()) for idx in exclude_animals[key]]
+    maxsets = [0]
+
+    groupsets = [
+
+        ['LsR', 'LsL'],
+        ['AblR', 'AblL'],
+        ['CtrR', 'CtrL'],
+        ['wt']
+
+    ]
+
+    mapdict['groupwise'] = ddict(list)
+    mapdict['gsetwise'] = ddict(list)
+    mapdict['dsetwise-gset'] = ddict(list)
+    mapdict['dsetwise-group'] = ddict(list)
+    nan = 0
+    nex = 0
+    for groupset in groupsets:
+
+        gset = '_'.join(groupset)
+        gskey_bl, gskey_cont = '_'.join([gset, '10k20f']), '_'.join([gset, '07k01f'])
+
+        print(gskey_bl)
+        for dno, dataset in enumerate(expset_names):
+
+            # Dataset # 1- indexed
+            gdkey_bl, gdkey_cont = '_'.join([gset, str(dno + 1), '10k20f']), '_'.join([gset, str(dno + 1), '07k01f'])
+
+            print(dataset, gdkey_bl)
+            maxset = len(glob.glob(datapath + '/' + dataset + '/*MapData.npy'))
+            df_ds = df_merged.loc[
+                (maxsets[dno] <= df_merged.animalSet.values) & (df_merged.animalSet.values < maxsets[dno] + maxset)]
+            print(df_ds.animalIndex.unique().shape, '123')
+            print(maxsets[dno], maxset + maxsets[dno])
+            for group in groupset:
+
+                if group not in df_ds.group.unique():
+                    print(group, 'not found')
+                    continue
+
+                print(group)
+                uan = df_ds.loc[df_ds.group == group].animalIndex.unique()
+
+                print(group, uan.shape)
+                grkey_bl, grkey_cont = '_'.join([group, '10k20f']), '_'.join([group, '07k01f'])
+                grdkey_bl, grdkey_cont = '_'.join([group, str(dno + 1), '10k20f']), '_'.join(
+                    [group, str(dno + 1), '07k01f'])
+                for an in uan:
+
+                    if an in exan:
+                        nex += 1
+                        nan += 1
+                        print('# animals ex', nex)
+
+                        continue
+
+                    nan += 1
+                    print('# animals', nan)
+                    nmap_bl = neighbormaps_bl[an - 1]
+                    nmap_cont = neighbormaps_cont[an - 1]
+
+                    mapdict['groupwise'][grkey_bl].append(np.flipud(nmap_bl))
+                    mapdict['groupwise'][grkey_cont].append(np.flipud(nmap_cont))
+                    mapdict['dsetwise-group'][grdkey_bl].append(np.flipud(nmap_bl))
+                    mapdict['dsetwise-group'][grdkey_cont].append(np.flipud(nmap_cont))
+
+                    if not group.endswith('L'):
+                        nmap_bl = np.flipud(nmap_bl)
+                        nmap_cont = np.flipud(nmap_cont)
+
+                    mapdict['dsetwise-gset'][gdkey_bl].append(nmap_bl)
+                    mapdict['dsetwise-gset'][gdkey_cont].append(nmap_cont)
+                    mapdict['gsetwise'][gskey_bl].append(nmap_bl)
+                    mapdict['gsetwise'][gskey_cont].append(nmap_cont)
+
+            maxsets.append(maxset)
+    pickle.dump(mapdict,
+                open(os.path.join(r'C:\Users\jkappel\PycharmProjects\jlsocialbehavior', 'mapdict.p'),
+                     'wb'))
+    return mapdict
+
+
 def generate_bout_vectors(
 
         exp_set,
@@ -340,7 +563,7 @@ def read_experiment_set(
     hostName = socket.gethostname()
     if hostName == 'O1-322':  # JJ desktop
 
-        base = 'C:\\Users\\jkappel\\J-sq\\{}\\'.format(expset_name)
+        base = 'J:\\_Projects\\J-sq\\{}\\'.format(expset_name)
         RawDataDir = base
         codeDir = 'C:\\Users\\jkappel\\PycharmProjects\\jlsocialbehavior'
 
@@ -788,11 +1011,18 @@ def merge_datasets(
         hd_merged = []
 
         # manually excluded animals, animalIndex from jlsocial df is 1-based, my Animal index as well
+        # exdict = {
+        #
+        #     0: np.array([8, 9, 10, 14, 17, 25, 27, 33, 38, 45, 47, 52, 58, 66, 69, 73]),
+        #
+        #     1: np.array([6, 13, 24, 34, 37, 38, 39, 45, 48, 50, 56, 57, 58, 62, 63, 64, 76, 84])
+        # }
+
         exdict = {
 
-            0: np.array([8, 9, 10, 14, 17, 25, 27, 33, 38, 45, 47, 52, 58, 66, 69, 73]),
+            0: np.array([8, 9, 10, 12, 14, 17, 18, 25, 27, 38, 66]),
 
-            1: np.array([6, 13, 24, 34, 37, 38, 39, 45, 48, 50, 56, 57, 58, 62, 63, 64, 76, 84])
+            1: np.array([6, 24, 34, 38, 40, 43])
         }
         for exno, expset_name in enumerate(mergeset):
 
