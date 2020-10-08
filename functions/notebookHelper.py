@@ -51,7 +51,7 @@ def groupCohen(x, cat='wt'):
         return ret
 
 
-def groupPower(x, cat='wt'):
+def groupPower(x, cat='wt',alpha=0.05,power=0.8):
     dat = x.groupby(['animalIndex', cat]).si.mean().unstack().reset_index()
     names = ['mnA', 'mnB', 'mnDiff', 'p', 'es', 'P', 'nA', 'nB', 'esReal', 'sPooled', 'sensitivity','s1','s2']
     catLevels = x[cat].unique()
@@ -72,9 +72,9 @@ def groupPower(x, cat='wt'):
         sd1,sd2 = np.std(a),np.std(b)
         s = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
 
-        P = sms.TTestIndPower().solve_power(effectSize, power=None, alpha=0.05, ratio=r, nobs1=nobs1)
+        P = sms.TTestIndPower().solve_power(effectSize, power=None, alpha=alpha, ratio=r, nobs1=nobs1)
         # Preal=sms.TTestIndPower().solve_power(esReal, power=None, alpha=0.05, ratio=r,nobs1=nobs1)
-        sens = sms.TTestIndPower().solve_power(effect_size=None, power=0.9, alpha=0.05, ratio=r, nobs1=nobs1)
+        sens = sms.TTestIndPower().solve_power(effect_size=None, power=power, alpha=alpha, ratio=r, nobs1=nobs1)
 
         return pd.Series([a.mean(),
                           b.mean(),
