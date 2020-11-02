@@ -273,19 +273,23 @@ def generate_bout_df(
 def generate_attraction_df(
 
     expset_names,
-    stim_protocols
+    stim_protocols,
+    datapath='C:/Users/jkappel/J-sq',
 ):
+    exp_sets = []
     for expset_name, stim_protocol in zip(expset_names, stim_protocols):
-        exp_set, limit, frames_ep, n_animals_sess, df = read_experiment_set(
+
+        exp_set, limit, frames_ep, n_animals_sess, df, base = read_experiment_set(
 
             expset_name=expset_name,
             stim_protocol=stim_protocol
 
         )
-        pickle.dump(exp_set, open('exp_set_{}.p'.format(expset_name), 'wb'))
-        pickle.dump(df, open('df_{}.p'.format(expset_name), 'wb'))
+        pickle.dump(exp_set, open(os.path.join(datapath, 'exp_set_{}.p'.format(expset_name)), 'wb'))
+        pickle.dump(df, open(os.path.join(datapath, 'df_{}.p'.format(expset_name)), 'wb'))
+        exp_sets.append(exp_set)
 
-    return
+    return exp_sets
 
 
 def calc_ansess(df):
@@ -471,7 +475,7 @@ def generate_mapdict(
                     print('# animals', nan)
                     nmap_bl = neighbormaps_bl[an - 1]
                     nmap_cont = neighbormaps_cont[an - 1]
-
+                    # flip because of UP/DOWN confusion in the raw data acquisition
                     mapdict['groupwise'][grkey_bl].append(np.flipud(nmap_bl))
                     mapdict['groupwise'][grkey_cont].append(np.flipud(nmap_cont))
                     mapdict['dsetwise-group'][grdkey_bl].append(np.flipud(nmap_bl))
@@ -502,6 +506,7 @@ def generate_bout_vectors(
         limit=None,
         crop=25,
         wl=20,
+        datadir='',
         tag='',
         shifted=False,
         swap_stim=False
@@ -516,6 +521,7 @@ def generate_bout_vectors(
     :param limit: int, limit index for any time series data (e.g. limit until 30000 frames)
     :param crop: int, cropping window for coarse bout extraction
     :param wl: int, smoothing window length for heading
+    :param datadir: str, data directory
     :param tag: str, tag for saving file
     :param shifted: bool, whether to shift the data or not
     :param swap_stim: bool, whether to swap continuous and bout-like stimulus
@@ -528,7 +534,9 @@ def generate_bout_vectors(
         crop=crop,
         shifted=shifted
     )
-    pickle.dump([all_bouts, all_bout_idxs], open('all_bouts_all_bout_idx_{}.p'.format(tag), 'wb'))
+    pickle.dump([all_bouts, all_bout_idxs], open(
+        os.path.join(datadir, 'all_bouts_all_bout_idx_{}.p'.format(tag)), 'wb'))
+
     window = calc_window(bout_mean)
 
     all_bout_xys = get_bout_positions(
@@ -545,10 +553,12 @@ def generate_bout_vectors(
         swap_stim=swap_stim
     )
 
-    pickle.dump(all_bout_xys, open('all_bout_xys_{}.p'.format(tag), 'wb'))
+    pickle.dump(all_bout_xys, open(
+        os.path.join(datadir, 'all_bout_xys_{}.p'.format(tag)), 'wb'))
 
     bout_df = generate_bout_df(all_bout_xys)
-    pickle.dump(bout_df, open('bout_df_{}.p'.format(tag), 'wb'))
+    pickle.dump(bout_df, open(
+        os.path.join(datadir, 'bout_df_{}.p'.format(tag)), 'wb'))
 
     return all_bout_xys, bout_df
 
@@ -556,38 +566,39 @@ def generate_bout_vectors(
 def read_experiment_set(
 
     expset_name='jjAblations',
-    stim_protocol='boutVsSmooth'
+    stim_protocol='boutVsSmooth',
+    load_expset=False
 
 ):
     # define folders based on hostName
     hostName = socket.gethostname()
     if hostName == 'O1-322':  # JJ desktop
 
-        base = 'J:\\_Projects\\J-sq\\{}\\'.format(expset_name)
-        RawDataDir = base
+        base = 'J:\\_Projects\\J-sq'
+        datadir = '{}\\{}\\'.format(base, expset_name)
         codeDir = 'C:\\Users\\jkappel\\PycharmProjects\\jlsocialbehavior'
 
-    elif hostName == 'O1-615':  # JJ desktop
+    elif hostName == 'O1-615':  # JJ laptop
 
-        base = 'C:\\Users\\jkappel\\J-sq\\{}\\'.format(expset_name)
-        RawDataDir = base
+        base = 'C:\\Users\\jkappel\\J-sq'
+        datadir = '{}\\{}\\'.format(base, expset_name)
         codeDir = 'C:\\Users\\jkappel\\PycharmProjects\\jlsocialbehavior\\jlsocialbehavior'
 
     else:
+
         print('No folders defined for this computer...')
+        return
 
-    ProcessingDir = RawDataDir
-    outputDir = RawDataDir
-
+    print('Data directory: ', datadir)
     os.chdir(codeDir)
 
-    expFile = base + '{}_allExp.xlsx'.format(expset_name)
-    anFile = base + '{}_allAn.xlsx'.format(expset_name)
-    info = pd.read_excel(expFile)
+    expfile = datadir + '{}_allExp.xlsx'.format(expset_name)
+    anfile = datadir + '{}_allAn.xlsx'.format(expset_name)
+    info = pd.read_excel(expfile)
     ix = (info.stimulusProtocol == stim_protocol)
     info = info[ix]
 
-    infoAn=pd.read_excel(anFile)
+    infoAn=pd.read_excel(anfile)
 
     # collect meta information and save to new csv file for batch processing
     posPath = []
@@ -601,7 +612,7 @@ def read_experiment_set(
 
     for index, row in info.iterrows():
 
-        startDir = RawDataDir + row.path + '\\'
+        startDir = datadir + row.path + '\\'
 
         posPath.append(glob.glob(startDir + 'PositionTxt*.txt')[0])
         PLPath.append(glob.glob(startDir + 'PL*.*')[0])
@@ -643,23 +654,32 @@ def read_experiment_set(
     info['computeLeadership'] = 0  # flag to compute leadership index (takes time, default: 1)
     info['ComputeBouts'] = 0  # flag to compute swim bout frequency (takes time, default: 1)
     # info['set'] = np.arange(len(posPath))   # experiment set: can label groups of experiments (default: 0)
-    info['ProcessingDir'] = ProcessingDir
-    info['outputDir'] = outputDir
+    info['ProcessingDir'] = datadir
+    info['outputDir'] = datadir
     info['expTime'] = expTime
     info['nShiftRuns'] = 3
     info['filteredMaps'] = True
 
-    csv_file = os.path.join(ProcessingDir, 'processingSettings.csv')
+    csv_file = os.path.join(datadir, 'processingSettings.csv')
     info.to_csv(csv_file, encoding='utf-8')
-    exp_set = es.experiment_set(csvFile=csv_file, MissingOnly=False)
+
+
+    if load_expset:
+
+        exp_set = pickle.load(open(
+            os.path.join(datadir, 'exp_set_{}.p'.format(expset_name)), 'rb'))
+
+    else:
+
+        exp_set = es.experiment_set(csvFile=csv_file, MissingOnly=False)
 
     csvPath = []
     mapPath = []
 
     for f in sorted([mu.splitall(x)[-1][:-4] for x in info.txtPath]):
         print(f)
-        csvPath.append(glob.glob(ProcessingDir + f + '*siSummary*.csv')[0])
-        mapPath.append(glob.glob(ProcessingDir + f + '*MapData.npy')[0])
+        csvPath.append(glob.glob(datadir + f + '*siSummary*.csv')[0])
+        mapPath.append(glob.glob(datadir + f + '*MapData.npy')[0])
 
     df = pd.DataFrame()
     max_id = 0
@@ -687,7 +707,7 @@ def read_experiment_set(
     limit = info['episodes'].unique()[0] * info['epiDur'].unique()[0] * 30 * 60
     frames_ep = (info['epiDur'].unique()[0] * 60 * 30)
 
-    return exp_set, limit, frames_ep, n_animals_sess, df
+    return exp_set, limit, frames_ep, n_animals_sess, df, base
 
 
 def calc_stats(
@@ -937,19 +957,27 @@ def collect_stats(
     return histograms, statistics
 
 
-def analyse_datasets():
+def analyse_datasets(
 
-    expset_names = ['jjAblations', 'jjAblationsGratingLoom']
-    stim_protocols = ['boutVsSmooth', 'boutVsSmooth_grateloom']
+    expset_names=('jjAblations', 'jjAblationsGratingLoom'),
+    stim_protocols=('boutVsSmooth', 'boutVsSmooth_grateloom'),
+    default_limit=None,
+    load_expset=False
+
+):
 
     for expset_name, stim_protocol in zip(expset_names, stim_protocols):
 
-        exp_set, limit, frames_ep, n_animals_sess, df = read_experiment_set(
+        exp_set, limit, frames_ep, n_animals_sess, df, base = read_experiment_set(
 
             expset_name=expset_name,
-            stim_protocol=stim_protocol
-
+            stim_protocol=stim_protocol,
+            load_expset=load_expset
         )
+
+        if default_limit is not None:
+
+            limit = default_limit
 
         for shifted, stag in zip([False, True], ['', 'shifted_']):
 
@@ -962,6 +990,7 @@ def analyse_datasets():
                 limit=limit,
                 crop=25,
                 wl=20,
+                datadir=base,
                 tag=expset_name+'_'+stag+'smooth_rot',
                 shifted=shifted,
                 swap_stim=False
@@ -978,11 +1007,13 @@ def analyse_datasets():
                 limit=limit,
                 crop=25,
                 wl=20,
+                datadir=base,
                 tag=expset_name+'_'+stag+'smooth_rot_swap_stim',
                 shifted=shifted,
                 swap_stim=True
             )
 
+    return base
 
 def merge_datasets(
 
@@ -1018,11 +1049,19 @@ def merge_datasets(
         #     1: np.array([6, 13, 24, 34, 37, 38, 39, 45, 48, 50, 56, 57, 58, 62, 63, 64, 76, 84])
         # }
 
+        # exdict = {
+        #
+        #     0: np.array([4, 8, 9, 10, 13, 14, 17, 18, 19, 20, 21, 25, 27, 34, 35, 36, 38, 39, 41, 45, 47, 58, 62, 66, 69, 73]),
+        #
+        #     1: np.array([6, 24, 28, 34, 37, 38, 39, 40, 41, 42, 43])
+        # }
+
         exdict = {
 
-            0: np.array([8, 9, 10, 12, 14, 17, 18, 25, 27, 38, 66]),
+            0: np.array([]),
 
-            1: np.array([6, 24, 34, 38, 40, 43])
+            1: np.array([])
+
         }
         for exno, expset_name in enumerate(mergeset):
 
@@ -1343,6 +1382,7 @@ def plot_vector_field(
               )
     return u, v, diffx, diffy, hist_pos
 
+
 if __name__ == "__main__":
 
     for_jl = False
@@ -1385,9 +1425,21 @@ if __name__ == "__main__":
 
     else:
 
-        #analyse_datasets()
+        # base = analyse_datasets(
+        #
+        #     expset_names=('jjAblations', 'jjAblationsGratingLoom'),
+        #     stim_protocols=('boutVsSmooth', 'boutVsSmooth_grateloom'),
+        #     default_limit=300*30*60,
+        #     load_expset=True
+        #
+        # )
+        base = r'J:/_Projects/J-sq'
         mergeset = ['jjAblations_smooth_rot', 'jjAblationsGratingLoom_smooth_rot']
-        bout_vectors, hd_merged, bout_df = merge_datasets(expset_merge=[mergeset])
+        bout_vectors, hd_merged, bout_df = merge_datasets(
+
+            expset_merge=[mergeset],
+            root=base
+        )
 
     # switching sign of the first dimension due to flipping of y axis in the data preprocessing
     if yflip:
