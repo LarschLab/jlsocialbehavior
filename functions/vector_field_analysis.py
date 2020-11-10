@@ -432,21 +432,29 @@ class VectorFieldAnalysis:
         self.default_limit = kwargs.get('default_limit', None)
         self.load_expset = kwargs.get('load_expset', False)
         self.cam_height = kwargs.get('cam_height', (105, 180))
+        self.fps = kwargs.get('fps', 30)
 
         self.bout_crop = kwargs.get('bout_crop', 25)
         self.bout_wl = kwargs.get('bout_wl', 20)
         self.smooth_alg = kwargs.get('smooth_alg', 'hamming')
         self.unique_episodes = kwargs.get('unique_episodes', ['07k01f', '10k20f'])
+
         self.nmap_res = kwargs.get('nmap_res', (30, 30))
-        self. = kwargs.get('', )
-        self. = kwargs.get('', )
-        self. = kwargs.get('', )
-        self. = kwargs.get('', )
-        self. = kwargs.get('', )
-        self. = kwargs.get('', )
-        self. = kwargs.get('', )
-        self. = kwargs.get('', )
-        self. = kwargs.get('', )
+        self.dist_filter = kwargs.get('dist_filter', (0, 30))
+        self.edges_pos = kwargs.get('edges_pos', (-20, 20))
+        self.edges_dir = kwargs.get('edges_dir', (-12, 12))
+        self.edges_angles = kwargs.get('edges_angles', (-np.pi, np.pi))
+        self.edges_dists = kwargs.get('edges_dists', (0, 30))
+        self.vmap_res = kwargs.get('vmap_res', (30, 30, 30, 30))
+        self.revtag = kwargs.get('revtag', 'L')
+        self.abs_dist = kwargs.get('abs_dist', True)
+
+        # self. = kwargs.get('', )
+        # self. = kwargs.get('', )
+        # self. = kwargs.get('', )
+        # self. = kwargs.get('', )
+        # self. = kwargs.get('', )
+        # self. = kwargs.get('', )
 
         # experiment set parameters
         self.epiDur = kwargs.get('epiDur', 5)
@@ -472,6 +480,21 @@ class VectorFieldAnalysis:
         self.exp_set = None
         self.bout_window = None
         self.all_bout_xys = None
+        self.stim_xys = None
+        self.fish_xys = None
+        self.stim_vectors = None
+        self.fish_vectors = None
+        self.bout_vectors = None
+        self.hd_diffs = None
+        self.dist = None
+        self.stim_hd = None
+        self.fish_hd = None
+        self.bout_df = None
+        self.neighbormaps_bl = None
+        self.neighbormaps_cont = None
+        self.sh_neighbormaps_bl = None
+        self.sh_neighbormaps_cont = None
+        self.histograms = None
 
         self.map_paths = glob.glob(os.path.join(base, self.expset_name, '*MapData.npy'))
 
@@ -568,7 +591,6 @@ class VectorFieldAnalysis:
         info['SaveNeighborhoodMaps'] = self.SaveNeighborhoodMaps  # flag to save neighborhood maps for subsequent analysis (takes time, default: 1)
         info['computeLeadership'] = self.computeLeadership  # flag to compute leadership index (takes time, default: 1)
         info['ComputeBouts'] = self.ComputeBouts  # flag to compute swim bout frequency (takes time, default: 1)
-        # info['set'] = np.arange(len(posPath))   # experiment set: can label groups of experiments (default: 0)
         info['ProcessingDir'] = self.base
         info['outputDir'] = self.base
         info['expTime'] = expTime
@@ -577,7 +599,6 @@ class VectorFieldAnalysis:
 
         csv_file = os.path.join(self.base, 'processingSettings.csv')
         info.to_csv(csv_file, encoding='utf-8')
-
 
         if self.load_expset:
 
@@ -619,8 +640,8 @@ class VectorFieldAnalysis:
         self.n_animals_sess = [self.dates_ids[np.where(self.dates_ids[:, 0] == date)[0], 1].astype(int).max() + 1 for date in
                           np.unique(self.dates_ids[:, 0])]
 
-        self.limit = info['episodes'].unique()[0] * info['epiDur'].unique()[0] * 30 * 60
-        self.frames_ep = (info['epiDur'].unique()[0] * 60 * 30)
+        self.limit = info['episodes'].unique()[0] * info['epiDur'].unique()[0] * self.fps * self.n_episodes
+        self.frames_ep = (info['epiDur'].unique()[0] * self.n_episodes * self.fps)
 
         pickle.dump(self.df, open(os.path.join(self.base, 'df_{}.p'.format(self.expset_name)), 'wb'))
         if not self.load_expset:
@@ -642,20 +663,18 @@ class VectorFieldAnalysis:
             bout_dir, 'wb'))
 
         self.bout_window = calc_window(bout_mean)
-        all_bout_xys = self.get_bout_positions(
-
+        self.get_bout_positions(
             all_bout_idxs,
             shifted=shifted,
             swap_stim=swap_stim
-
         )
 
-        pickle.dump(all_bout_xys, open(
-            os.path.join(self.base, 'all_bout_xys_{}.p'.format(tag)), 'wb'))
+        pickle.dump(self.all_bout_xys, open(
+            os.path.join(self.base, 'all_bout_xys_{}{}.p'.format(self.expset_name, tag)), 'wb'))
 
-        self.generate_bout_df(all_bout_xys)
+        self.calc_bout_vectors(self.all_bout_xys)
         pickle.dump(self.bout_df, open(
-            os.path.join(self.base, 'bout_df_{}.p'.format(tag)), 'wb'))
+            os.path.join(self.base, 'bout_df_{}{}.p'.format(self.expset_name, tag)), 'wb'))
 
         return
 
@@ -781,7 +800,7 @@ class VectorFieldAnalysis:
                 }
         return
 
-    def calculate_bout_vectors(self):
+    def calc_bout_vectors(self):
 
         '''
         Calculate the distance of each bout, generate df containing all bout information
@@ -809,24 +828,25 @@ class VectorFieldAnalysis:
         self.hd_diffs = np.array([startdiff, stopdiff, diffdiff]).T
 
         # Meta params
-        self.bout_animal_idxs = np.concatenate(
+        bout_animal_idxs = np.concatenate(
             [[anid] * len(self.all_bout_xys[anid]['stim_xys']) for anid in animal_idxs]
             , axis=0)
-        self.bout_groups = np.concatenate(
+        bout_groups = np.concatenate(
             [[self.all_bout_xys[anid]['group']] * len(self.all_bout_xys[anid]['stim_xys']) for anid in animal_idxs]
             , axis=0)
-        self.bout_episodes = np.array([ep[1] for anid in animal_idxs for ep in self.all_bout_xys[anid]['bout_episodes']])
-        self.bout_idxs = np.array([ep[0] for anid in animal_idxs for ep in self.all_bout_xys[anid]['bout_episodes']])
+        bout_episodes = np.array([ep[1] for anid in animal_idxs for ep in self.all_bout_xys[anid]['bout_episodes']])
+        bout_idxs = np.array([ep[0] for anid in animal_idxs for ep in self.all_bout_xys[anid]['bout_episodes']])
 
         self.bout_df = pd.DataFrame({
 
-            'Episode': self.bout_episodes,
-            'Animal index': self.bout_animal_idxs + 1,
+            'Episode': bout_episodes,
+            'Animal index': bout_animal_idxs + 1,
             'Bout distance': self.dist,
-            'Group': self.bout_groups,
-            'Bout index': self.bout_idxs
+            'Group': bout_groups,
+            'Bout index': bout_idxs
         })
         print('Shape of bout dataframe: ', self.bout_df.shape)
+        pickle.dump(self.bout_df, open(os.path.join(self.base, 'bout_df_{}.p'.format(self.expset_name)), 'wb'))
         return
 
     def extract_nmaps(self):
@@ -840,9 +860,10 @@ class VectorFieldAnalysis:
 
         """
 
+        n_animals = sum(self.n_animals_thresh)
         # Filtered
-        self.neighbormaps_bl = np.zeros((self.n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
-        self.neighbormaps_cont = np.zeros((self.n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
+        self.neighbormaps_bl = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
+        self.neighbormaps_cont = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
 
         for nmap, stimtype in zip([self.neighbormaps_bl, self.neighbormaps_cont], self.unique_episodes):
 
@@ -862,8 +883,8 @@ class VectorFieldAnalysis:
                     nmap[an, :, :] = np.nanmean(tmp[ix, 0, 0, :, :], axis=0)
 
         # Shifted filtered
-        self.sh_neighbormaps_bl = np.zeros((self.n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
-        self.sh_neighbormaps_cont = np.zeros((self.n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
+        self.sh_neighbormaps_bl = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
+        self.sh_neighbormaps_cont = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
 
         for nmap, stimtype in zip([self.sh_neighbormaps_bl, self.sh_neighbormaps_cont], self.unique_episodes):
 
@@ -884,365 +905,223 @@ class VectorFieldAnalysis:
                     nmap[an, :, :] = np.nanmean(tmp[ix, 0, 1, :, :], axis=0)
         return
 
-    def generate_mapdict(
+    # def generate_mapdict(
+    #
+    #     self,
+    #     expset_names,
+    #     exclude_animals,
+    #     datapath='J:/_Projects/J-sq',
+    #     groupsets=(),
+    #     sortlogics=()
+    #
+    # ):
+    #     from collections import defaultdict as ddict
+    #     mapdict = {}
+    #     if isinstance(exclude_animals, dict):
+    #         exan = [idx for key in sorted(exclude_animals.keys()) for idx in exclude_animals[key]]
+    #     else:
+    #         exan = exclude_animals
+    #     if isinstance(expset_names, str):
+    #         expset_names = [expset_names]
+    #     maxsets = [0]
+    #
+    #     for sl in sortlogics:
+    #         mapdict[sl] = ddict(list)
+    #
+    #     nan = 0
+    #     nex = 0
+    #
+    #     for groupset in groupsets:
+    #
+    #         gset = '_'.join(groupset)
+    #         gskey_bl, gskey_cont = '_'.join([gset, '10k20f']), '_'.join([gset, '07k01f'])
+    #
+    #         print(gskey_bl)
+    #         for dno, dataset in enumerate(expset_names):
+    #
+    #             # Dataset # 1- indexed
+    #             gdkey_bl, gdkey_cont = '_'.join([gset, str(dno + 1), '10k20f']), '_'.join([gset, str(dno + 1), '07k01f'])
+    #
+    #             print(dataset, gdkey_bl)
+    #             maxset = len(glob.glob(datapath + '/' + dataset + '/*MapData.npy'))
+    #             df_ds = df_merged.loc[
+    #                 (maxsets[dno] <= df_merged.animalSet.values) & (df_merged.animalSet.values < maxsets[dno] + maxset)]
+    #             print(df_ds.animalIndex.unique().shape, '123')
+    #             print(maxsets[dno], maxset + maxsets[dno])
+    #             for group in groupset:
+    #
+    #                 if group not in df_ds.group.unique():
+    #                     print(group, 'not found')
+    #                     continue
+    #
+    #                 print(group)
+    #                 uan = df_ds.loc[df_ds.group == group].animalIndex.unique()
+    #
+    #                 print(group, uan.shape)
+    #                 grkey_bl, grkey_cont = '_'.join([group, '10k20f']), '_'.join([group, '07k01f'])
+    #                 grdkey_bl, grdkey_cont = '_'.join([group, str(dno + 1), '10k20f']), '_'.join(
+    #                     [group, str(dno + 1), '07k01f'])
+    #                 for an in uan:
+    #
+    #                     if an in exan:
+    #                         nex += 1
+    #                         nan += 1
+    #                         print('# animals ex', nex)
+    #
+    #                         continue
+    #
+    #                     nan += 1
+    #                     print('# animals', nan)
+    #                     nmap_bl = neighbormaps_bl[an - 1]
+    #                     nmap_cont = neighbormaps_cont[an - 1]
+    #                     # flip because of UP/DOWN confusion in the raw data acquisition
+    #
+    #                     for sl in sortlogics:
+    #
+    #                         if sl not in ['dsetwise-gset', 'gsetwise']:
+    #
+    #                             mapdict[sl][grkey_bl].append(np.flipud(nmap_bl))
+    #                             mapdict[sl][grkey_cont].append(np.flipud(nmap_cont))
+    #
+    #                         else:
+    #
+    #                             if not group.endswith('L'):
+    #
+    #                                 nmap_bl = np.flipud(nmap_bl)
+    #                                 nmap_cont = np.flipud(nmap_cont)
+    #
+    #                             mapdict[sl][gdkey_bl].append(nmap_bl)
+    #                             mapdict[sl][gdkey_cont].append(nmap_cont)
+    #
+    #             maxsets.append(maxset)
+    #     pickle.dump(mapdict,
+    #                 open(os.path.join(base, 'mapdict_{}.p'.format(dataset)),
+    #                      'wb'))
+    #     return mapdict
 
-        self,
-        expset_names,
-        exclude_animals,
-        datapath='J:/_Projects/J-sq',
-        groupsets=(),
-        sortlogics=()
+    def collect_vector_hists(self):
 
-    ):
-        from collections import defaultdict as ddict
-        mapdict = {}
-        if isinstance(exclude_animals, dict):
-            exan = [idx for key in sorted(exclude_animals.keys()) for idx in exclude_animals[key]]
-        else:
-            exan = exclude_animals
-        if isinstance(expset_names, str):
-            expset_names = [expset_names]
-        maxsets = [0]
-
-        for sl in sortlogics:
-            mapdict[sl] = ddict(list)
-
-        nan = 0
-        nex = 0
-
-        for groupset in groupsets:
-
-            gset = '_'.join(groupset)
-            gskey_bl, gskey_cont = '_'.join([gset, '10k20f']), '_'.join([gset, '07k01f'])
-
-            print(gskey_bl)
-            for dno, dataset in enumerate(expset_names):
-
-                # Dataset # 1- indexed
-                gdkey_bl, gdkey_cont = '_'.join([gset, str(dno + 1), '10k20f']), '_'.join([gset, str(dno + 1), '07k01f'])
-
-                print(dataset, gdkey_bl)
-                maxset = len(glob.glob(datapath + '/' + dataset + '/*MapData.npy'))
-                df_ds = df_merged.loc[
-                    (maxsets[dno] <= df_merged.animalSet.values) & (df_merged.animalSet.values < maxsets[dno] + maxset)]
-                print(df_ds.animalIndex.unique().shape, '123')
-                print(maxsets[dno], maxset + maxsets[dno])
-                for group in groupset:
-
-                    if group not in df_ds.group.unique():
-                        print(group, 'not found')
-                        continue
-
-                    print(group)
-                    uan = df_ds.loc[df_ds.group == group].animalIndex.unique()
-
-                    print(group, uan.shape)
-                    grkey_bl, grkey_cont = '_'.join([group, '10k20f']), '_'.join([group, '07k01f'])
-                    grdkey_bl, grdkey_cont = '_'.join([group, str(dno + 1), '10k20f']), '_'.join(
-                        [group, str(dno + 1), '07k01f'])
-                    for an in uan:
-
-                        if an in exan:
-                            nex += 1
-                            nan += 1
-                            print('# animals ex', nex)
-
-                            continue
-
-                        nan += 1
-                        print('# animals', nan)
-                        nmap_bl = neighbormaps_bl[an - 1]
-                        nmap_cont = neighbormaps_cont[an - 1]
-                        # flip because of UP/DOWN confusion in the raw data acquisition
-
-                        for sl in sortlogics:
-
-                            if sl not in ['dsetwise-gset', 'gsetwise']:
-
-                                mapdict[sl][grkey_bl].append(np.flipud(nmap_bl))
-                                mapdict[sl][grkey_cont].append(np.flipud(nmap_cont))
-
-                            else:
-
-                                if not group.endswith('L'):
-
-                                    nmap_bl = np.flipud(nmap_bl)
-                                    nmap_cont = np.flipud(nmap_cont)
-
-                                mapdict[sl][gdkey_bl].append(nmap_bl)
-                                mapdict[sl][gdkey_cont].append(nmap_cont)
-
-                maxsets.append(maxset)
-        pickle.dump(mapdict,
-                    open(os.path.join(base, 'mapdict_{}.p'.format(dataset)),
-                         'wb'))
-        return mapdict
-
-    def collect_stats(
-
-        self,
-        bout_df,
-        bout_vectors,
-        sortlogics=('gsetwise','dsetwise-group', 'dsetwise-gset'),
-        groupsets=(),
-        statistic=None,
-        statvals=None,
-        hd_hist=False,
-        rel_stim_hd=None,
-        dist_type='abs',
-        angles=False,
-        dist_filter=(0, 30),
-        edges_pos=(-20, 20),
-        edges_dir=(-12, 12),
-        edges_angles=(-np.pi, np.pi),
-        edges_dists=(0, 30),
-        res=(30, 30, 30, 30)
-
-    ):
-
-        if hd_hist:
-
-            bin_edges = [edges_pos, edges_pos, edges_angles, edges_dists, edges_angles]
-
-        elif angles:
-
-            bin_edges = [edges_pos, edges_pos, edges_angles, edges_dists]
-
-        else:
-
-            bin_edges = [edges_pos, edges_pos, edges_dir, edges_dir]
-
+        bin_edges = [self.edges_pos, self.edges_pos, self.edges_angles, self.edges_dists]
         bin_edges = [np.linspace(b[0], b[1], res[bno] + 1) for bno, b in enumerate(bin_edges)]
 
-        histograms = {}
-        statistics = {}
+        self.histograms = {}
+
         for sl in sortlogics:
 
-            histograms[sl] = ddict(list)
-            statistics[sl] = ddict(list)
+            self.histograms[sl] = ddict(list)
 
         episodes = bout_df['Episode'].unique()
-        datasets = bout_df['Dataset'].unique()
         distances = bout_df['Bout distance'].values
 
-        for dataset in datasets:
-            print(''.join(['.'] * 50))
-            print('Dataset: ', dataset)
-            for groupset in groupsets:
+        for groupset in self.groupsets:
 
-                print('Groupset: ', groupset)
-                for group in groupset:
+            print('Groupset: ', groupset)
+            for group in groupset:
 
-                    anids = bout_df[(bout_df['Group'] == group) & (bout_df['Dataset'] == dataset)]['Animal index'].unique()
+                anids = bout_df[(bout_df['Group'] == group)]['Animal index'].unique()
 
-                    print('Group: ', group)
-                    for anid in anids:
+                print('Group: ', group)
+                for anid in anids:
 
-                        print('Animal index: ', anid)
-                        for episode in episodes:
+                    print('Animal index: ', anid)
+                    for episode in episodes:
 
-                            print('Episode: ', episode)
-                            thresh = (
-                                    (dist_filter[0] < bout_df['Bout distance'])
-                                    & (dist_filter[1] > bout_df['Bout distance'])
-                                    & (bout_df['Dataset'] == dataset)
-                                    & (bout_df['Group'] == group)
-                                    & (bout_df['Animal index'] == anid)
-                                    & (bout_df['Episode'] == episode)
-                            )
+                        print('Episode: ', episode)
+                        thresh = (
+                                (self.dist_filter[0] < bout_df['Bout distance'])
+                                & (self.dist_filter[1] > bout_df['Bout distance'])
+                                & (bout_df['Group'] == group)
+                                & (bout_df['Animal index'] == anid)
+                                & (bout_df['Episode'] == episode)
+                        )
 
-                            vectors_thresh = bout_vectors[np.where(thresh)].copy()
+                        vectors_thresh = self.bout_vectors[np.where(thresh)].copy()
 
-                            print('# of bouts: ', vectors_thresh.shape[0])
+                        print('# of bouts: ', vectors_thresh.shape[0])
 
-                            if group.endswith('L'):
+                        if self.revtag:
+                            if group.endswith(self.revtag):
 
                                 vectors_thresh_rev = vectors_thresh.copy()
                                 vectors_thresh_rev[:, 0] *= -1
                                 vectors_thresh_rev[:, 2] *= -1
 
-                            if dist_type == 'abs':
+                        if self.abs_dist:
 
-                                distances_thresh = distances[thresh]
+                            distances_thresh = distances[thresh]
 
-                            else:  # 'rel'
+                        else:  # 'rel', TODO: should be angular distance!
 
-                                distances_thresh = np.sqrt(vectors_thresh[:, 3] ** 2 + vectors_thresh[:, 2] ** 2)
+                            distances_thresh = np.sqrt(vectors_thresh[:, 3] ** 2 + vectors_thresh[:, 2] ** 2)
 
-                            if statistic:
 
-                                statvals_thresh = [i[np.where(thresh)] for i in statvals]
+                        hist, uv_stats = calc_stats(
 
-                            else:
+                            vectors_thresh,
+                            bin_edges,
+                            dist=distances_thresh,
+                            angles=angles,
 
-                                statvals_thresh = None
-
-                            if not hd_hist:
-
-                                hist, uv_stats = calc_stats(
-
-                                    vectors_thresh,
-                                    bin_edges,
-                                    dist=distances_thresh,
-                                    angles=angles,
-                                    statistic=statistic,
-                                    statvals=statvals_thresh,
-                                )
-                                if 'dsetwise-gset' in sortlogics or 'gsetwise' in sortlogics:
-                                    hist_rev, uv_stats_rev = calc_stats(
-
-                                        vectors_thresh_rev,
-                                        bin_edges,
-                                        dist=distances_thresh,
-                                        angles=angles,
-                                        statistic=statistic,
-                                        statvals=statvals_thresh,
-                                    )
-
-                            else:
-
-                                hist = calc_stats_alt(
-
-                                    vectors_thresh,
-                                    bin_edges,
-                                    distances_thresh,
-                                    rel_stim_hd[thresh]
-
-                                )
-                                if 'dsetwise-gset' in sortlogics or 'gsetwise' in sortlogics:
-                                    hist_rev = calc_stats_alt(
+                        )
+                        if self.revtag:
+                            if  'gsetwise' in sortlogics:
+                                hist_rev, uv_stats_rev = calc_stats(
 
                                     vectors_thresh_rev,
                                     bin_edges,
-                                    distances_thresh,
-                                    rel_stim_hd[thresh]
+                                    dist=distances_thresh,
+                                    angles=angles,
 
-                                    )
-                            hist = hist.astype(np.int16)  # changed to int16
+                                )
 
-                            if group == 'ctr':
+                        hist = hist.astype(np.int16)  # changed to int16
 
-                                groupstr = 'wt'
+                        if group == 'ctr':
 
-                            else:
+                            groupstr = 'wt'
 
-                                groupstr = group
+                        else:
 
-                            for sl in sortlogics:
+                            groupstr = group
 
-                                if sl == 'groupwise':
+                        for sl in self.sortlogics:
 
+                            if sl == 'groupwise':
+
+                                gkey = '_'.join([groupstr, episode])
+                                self.histograms[sl][gkey].append(hist)
+
+                            elif sl == 'gsetwise':
+
+                                gkey = '_'.join([groupset[0], groupset[1], episode])
+                                if groupstr == 'wt':
                                     gkey = '_'.join([groupstr, episode])
-                                    histograms[sl][gkey].append(hist)
-                                    if statistic:
-                                        statistics[sl][gkey].append(uv_stats)
+                                if group.endswith(self.revtag):
+                                    self.histograms[sl][gkey].append(hist_rev)
+                                else:
+                                    self.histograms[sl][gkey].append(hist)
 
-                                elif sl == 'gsetwise':
+                            # elif sl == 'dsetwise-gset':
+                            #
+                            #     gkey = '_'.join([groupset[0], groupset[1], str(dataset), episode])
+                            #     if groupstr == 'wt':
+                            #         gkey = '_'.join([groupstr, str(dataset), episode])
+                            #
+                            #     if group.endswith(self.revtag):
+                            #         self.histograms[sl][gkey].append(hist_rev)
+                            #     else:
+                            #         self.histograms[sl][gkey].append(hist)
+                            #
+                            # elif sl == 'dsetwise-group':
+                            #
+                            #     gkey = '_'.join([groupstr, str(dataset), episode])
+                            #     self.histograms[sl][gkey].append(hist)
 
-                                    gkey = '_'.join([groupset[0], groupset[1], episode])
-                                    if groupstr == 'wt':
-                                        gkey = '_'.join([groupstr, episode])
+                        print('Dictionary key: ', gkey)
+                        print('Unique hist vals: ', np.unique(hist).shape[0])
+                        del vectors_thresh
 
-                                    histograms[sl][gkey].append(hist_rev)
-                                    if statistic:
-                                        statistics[sl][gkey].append(uv_stats_rev)
-
-                                elif sl == 'dsetwise-gset':
-
-                                    gkey = '_'.join([groupset[0], groupset[1], str(dataset), episode])
-                                    if groupstr == 'wt':
-                                        gkey = '_'.join([groupstr, str(dataset), episode])
-
-                                    histograms[sl][gkey].append(hist_rev)
-                                    if statistic:
-                                        statistics[sl][gkey].append(uv_stats_rev)
-
-                                elif sl == 'dsetwise-group':
-
-                                    gkey = '_'.join([groupstr, str(dataset), episode])
-                                    histograms[sl][gkey].append(hist)
-                                    if statistic:
-                                        statistics[sl][gkey].append(uv_stats)
-
-                            print('Dictionary key: ', gkey)
-                            print('Unique hist vals: ', np.unique(hist).shape[0])
-                            del vectors_thresh
-
-        return histograms, statistics
-
-    def get_processed_data(
-
-        self,
-        base='J:/_Projects/J-sq/',
-        expset_name=None,
-        exan=None,
-        groupsets=[['AblB'], ['CtrE'], ['Bv']],
-        sortlogics=['groupwise'],
-        dist_type='abs'
-
-    ):
-
-        """
-        Get all processed data for analysis
-        :param root: str, data directory
-        :param expset_merge: list of lists, -> names of datasets to merge, see below
-        :return:
-        """
-
-        all_bout_xys = pickle.load(open(os.path.join(root, 'all_bout_xys_{}.p'.format(expset_name)), 'rb'))
-        bout_df = pickle.load(open(os.path.join(root, 'bout_df_{}.p'.format(expset_name)), 'rb'))
-
-        anfilt = np.invert([i in exan for i in bout_df['Animal index'].values])
-        df_filt = bout_df[anfilt]
-
-        stim_xys = np.array([j for i in all_bout_xys for j in i[1]])[anfilt]
-        stim_hd = np.array([j for i in all_bout_xys for j in i[3]])[anfilt]
-        fish_xys = np.array([j for i in all_bout_xys for j in i[2]])[anfilt]
-        fish_hd = np.array([j for i in all_bout_xys for j in i[4]])[anfilt]
-
-        stim_vectors = np.concatenate([stim_xys[:, 0], stim_xys[:, 1] - stim_xys[:, 0]], axis=1)
-        nanfilt = np.invert([any(i) for i in np.isnan(stim_vectors)])
-        vectors_filt = stim_vectors[nanfilt]
-
-        startdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(stim_hd[:, 0], fish_hd[:, 0])]
-        stopdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(stim_hd[:, 1], fish_hd[:, 1])]
-        diffdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(stopdiff, startdiff)]
-        hd_diffs = np.array([startdiff, stopdiff, diffdiff]).T
-
-        hd_diffs = hd_diffs[nanfilt]
-        df_filt = df_filt[nanfilt]
-
-        exp_set = pickle.load(open(glob.glob(os.path.join(base, expset_name, 'exp_set*'))[0], 'rb'))
-
-        map_paths = glob.glob(os.path.join(base, expset_name, '/*MapData.npy'))
-
-        df = pickle.load(open(os.path.join(base, 'df_{}.p'.format(expset_name)), 'rb'))
-        neighbormaps_bl, neighbormaps_cont, sh_neighbormaps_bl, sh_neighbormaps_cont = extract_nmaps(
-
-            df,
-            map_paths,
-            analysisstart=0,
-            analysisend=540,
-
-        )
-
-        mapdict = generate_mapdict(
-
-            df_merged,
-            neighbormaps_bl,
-            neighbormaps_cont,
-            expset_name,
-            exan,
-            datapath=base,
-            groupsets=groupsets,
-            sortlogics=sortlogics
-        )
-        histograms = pickle.load(open(os.path.join(base, 'histograms_{}_{}_{}_dict.p'.format(
-            ''.join(expset_name),
-            '_'.join(sortlogics),
-            dist_type)), 'rb'))
-
-        return
+        pickle.dump(self.histograms, open(os.path.join(self.base, 'histograms_{}.p'.format(self.expset_name)), 'wb'))
 
     def plot_vfs_ind(
 
