@@ -431,13 +431,15 @@ class VectorFieldAnalysis:
         self.yflip = kwargs.get('yflip', True)
         self.default_limit = kwargs.get('default_limit', None)
         self.load_expset = kwargs.get('load_expset', False)
-        self.cam_height = kwargs.get('cam_height', (105, 180))
+        self.cam_height = kwargs.get('cam_height', [105, 180])
         self.fps = kwargs.get('fps', 30)
 
         self.bout_crop = kwargs.get('bout_crop', 25)
-        self.bout_wl = kwargs.get('bout_wl', 20)
+        self.smooth_wl = kwargs.get('smooth_wl', 20)
         self.smooth_alg = kwargs.get('smooth_alg', 'hamming')
         self.unique_episodes = kwargs.get('unique_episodes', ['07k01f', '10k20f'])
+        self.groupsets = kwargs.get('groupsets', [])
+        self.sortlogics = kwargs.get('sortlogics', ['groupwise'])
 
         self.nmap_res = kwargs.get('nmap_res', (30, 30))
         self.dist_filter = kwargs.get('dist_filter', (0, 30))
@@ -448,9 +450,7 @@ class VectorFieldAnalysis:
         self.vmap_res = kwargs.get('vmap_res', (30, 30, 30, 30))
         self.revtag = kwargs.get('revtag', 'L')
         self.abs_dist = kwargs.get('abs_dist', True)
-
-        # self. = kwargs.get('', )
-        # self. = kwargs.get('', )
+        self.exclude_animals = kwargs.get('exculde_animals', [])
         # self. = kwargs.get('', )
         # self. = kwargs.get('', )
         # self. = kwargs.get('', )
@@ -466,8 +466,8 @@ class VectorFieldAnalysis:
         self.recomputeAnimalSize = kwargs.get('recomputeAnimalSize', 0)
         self.SaveNeighborhoodMaps = kwargs.get('SaveNeighborhoodMaps', 1)
         self.computeLeadership = kwargs.get('computeLeadership', 0)
-        self.ComputeBouts = kwargs.get('ComputeBouts', 0)
-        self. nShiftRuns = kwargs.get('nShiftRuns', 3)
+        self.computeBouts = kwargs.get('computeBouts', 0)
+        self.nShiftRuns = kwargs.get('nShiftRuns', 3)
         self.filteredMaps = kwargs.get('filteredMaps', True)
 
         #setting None attributes
@@ -479,7 +479,6 @@ class VectorFieldAnalysis:
         self.anfile = None
         self.exp_set = None
         self.bout_window = None
-        self.all_bout_xys = None
         self.stim_xys = None
         self.fish_xys = None
         self.stim_vectors = None
@@ -495,8 +494,13 @@ class VectorFieldAnalysis:
         self.sh_neighbormaps_bl = None
         self.sh_neighbormaps_cont = None
         self.histograms = None
+        self.mapdict = None
 
-        self.map_paths = glob.glob(os.path.join(base, self.expset_name, '*MapData.npy'))
+        self.map_paths = glob.glob(os.path.join(self.base, self.expset_name, '*MapData.npy'))
+
+    def load_dataset(self):
+
+        ";;;"
 
     def process_dataset(self):
 
@@ -532,8 +536,8 @@ class VectorFieldAnalysis:
 
     def read_experiment_set(self):
 
-        self.expfile = os.path.join(base, '{}_allExp.xlsx'.format(self.expset_name))
-        self.anfile = os.path.join(base, '{}_allAn.xlsx'.format(self.expset_name))
+        self.expfile = os.path.join(self.base, self.expset_name, '{}_allExp.xlsx'.format(self.expset_name))
+        self.anfile = os.path.join(self.base, self.expset_name, '{}_allAn.xlsx'.format(self.expset_name))
         info = pd.read_excel(self.expfile)
         ix = (info.stimulusProtocol == self.stim_protocol)
         info = info[ix]
@@ -550,16 +554,16 @@ class VectorFieldAnalysis:
 
         for index, row in info.iterrows():
 
-            start_dir = os.path.join(base, row.path)
-
-            posPath.append(glob.glob(start_dir + 'PositionTxt*.txt')[0])
-            PLPath.append(glob.glob(start_dir + 'PL*.*')[0])
+            start_dir = os.path.join(self.base, self.expset_name, row.path)
+            print(start_dir)
+            posPath.append(glob.glob(start_dir + '/PositionTxt*.txt')[0])
+            PLPath.append(glob.glob(start_dir + '/PL*.*')[0])
 
             head, tail = os.path.split(posPath[-1])
             currTime = datetime.strptime(tail[-23:-4], '%Y-%m-%dT%H_%M_%S')
             expTime.append(currTime)
 
-            camHeightAll.append(self.cam_height)
+            camHeightAll.append(self.cam_height[('_dn_' in head) * 1])
 
             anNrs = row.anNr  # Note that anNrs are 1 based!
             if ':' in anNrs:
@@ -590,7 +594,7 @@ class VectorFieldAnalysis:
         info['recomputeAnimalSize'] = self.recomputeAnimalSize  # flag to compute animals size from avi file (takes time, default: 1)
         info['SaveNeighborhoodMaps'] = self.SaveNeighborhoodMaps  # flag to save neighborhood maps for subsequent analysis (takes time, default: 1)
         info['computeLeadership'] = self.computeLeadership  # flag to compute leadership index (takes time, default: 1)
-        info['ComputeBouts'] = self.ComputeBouts  # flag to compute swim bout frequency (takes time, default: 1)
+        info['ComputeBouts'] = self.computeBouts  # flag to compute swim bout frequency (takes time, default: 1)
         info['ProcessingDir'] = self.base
         info['outputDir'] = self.base
         info['expTime'] = expTime
@@ -614,8 +618,8 @@ class VectorFieldAnalysis:
 
         for f in sorted([mu.splitall(x)[-1][:-4] for x in info.txtPath]):
 
-            csvPath.append(glob.glob(self.base + f + '*siSummary*.csv')[0])
-            mapPath.append(glob.glob(self.base + f + '*MapData.npy')[0])
+            csvPath.append(glob.glob(os.path.join(self.base, f + '*siSummary*.csv'))[0])
+            mapPath.append(glob.glob(os.path.join(self.base, f + '*MapData.npy'))[0])
 
         df = pd.DataFrame()
         max_id = 0
@@ -624,8 +628,7 @@ class VectorFieldAnalysis:
             tmp = pd.read_csv(fn, index_col=0, sep=',')
             tmp.animalSet = i
             tmp.animalIndex = tmp.animalIndex + max_id + 1
-
-            # tmp.animalIndex = np.array(anIDsAll)[tmp.animalIndex]
+            #tmp.animalIndex = np.array(anIDsAll)[tmp.animalIndex]
 
             max_id = tmp.animalIndex.values.max()
             df = pd.concat([df, tmp])
@@ -640,8 +643,8 @@ class VectorFieldAnalysis:
         self.n_animals_sess = [self.dates_ids[np.where(self.dates_ids[:, 0] == date)[0], 1].astype(int).max() + 1 for date in
                           np.unique(self.dates_ids[:, 0])]
 
-        self.limit = info['episodes'].unique()[0] * info['epiDur'].unique()[0] * self.fps * self.n_episodes
-        self.frames_ep = (info['epiDur'].unique()[0] * self.n_episodes * self.fps)
+        self.limit = info['episodes'].unique()[0] * info['epiDur'].unique()[0] * self.fps * 60
+        self.frames_ep = info['epiDur'].unique()[0] * self.fps * 60
 
         pickle.dump(self.df, open(os.path.join(self.base, 'df_{}.p'.format(self.expset_name)), 'wb'))
         if not self.load_expset:
@@ -657,24 +660,24 @@ class VectorFieldAnalysis:
         swap_stim=False
 
     ):
-        bout_dir = os.path.join(self.base, 'all_bouts_all_bout_idx_{}.p'.format(tag))
+        print('generating bout vectors')
+        bout_dir = os.path.join(self.base, 'all_bouts_all_bout_idx_{0}{1}.p'.format(self.expset_name, tag))
         all_bouts, all_bout_idxs, bout_mean = self.collect_bouts(shifted=shifted)
         pickle.dump([all_bouts, all_bout_idxs, bout_mean], open(
             bout_dir, 'wb'))
 
         self.bout_window = calc_window(bout_mean)
-        self.get_bout_positions(
+        all_bout_xys = self.get_bout_positions(
             all_bout_idxs,
             shifted=shifted,
-            swap_stim=swap_stim
+            swap_stim=swap_stim,
+            tag=tag
         )
 
-        pickle.dump(self.all_bout_xys, open(
-            os.path.join(self.base, 'all_bout_xys_{}{}.p'.format(self.expset_name, tag)), 'wb'))
-
-        self.calc_bout_vectors(self.all_bout_xys)
-        pickle.dump(self.bout_df, open(
-            os.path.join(self.base, 'bout_df_{}{}.p'.format(self.expset_name, tag)), 'wb'))
+        self.calc_bout_vectors(all_bout_xys, tag=tag)
+        self.extract_nmaps()
+        self.generate_mapdict(tag=tag)
+        self.collect_vector_hists(tag=tag)
 
         return
 
@@ -684,6 +687,7 @@ class VectorFieldAnalysis:
         Collect all bout idxs and all bout periods from all fish
         """
 
+        print('collecting bouts')
         all_bouts = []
         all_bout_idxs = []
         animal_idx = -1
@@ -718,12 +722,14 @@ class VectorFieldAnalysis:
             self,
             all_bout_idxs,
             shifted=False,
-            swap_stim=False
+            swap_stim=False,
+            tag=''
 
     ):
+        print('getting bout positions')
         w1, w11, w2, w21 = self.bout_window
         animal_idx = -1
-        self.all_bout_xys = dict()
+        all_bout_xys = dict()
 
         for j in range(len(self.n_animals_sess)):
 
@@ -739,24 +745,27 @@ class VectorFieldAnalysis:
                     raise IndexError('Animal Index does not match! Exiting...')
 
                 if shifted:
-                    print('Shift applied to data: ', exp_set.experiments[j].shiftList[0])
-                    exp_set.experiments[j].pair_f[i].shift = [exp_set.experiments[j].shiftList[0], 0]
+                    print('Shift applied to data: ', self.exp_set.experiments[j].shiftList[0])
+                    self.exp_set.experiments[j].pair_f[i].shift = [self.exp_set.experiments[j].shiftList[0], 0]
 
-                ts = exp_set.experiments[j].pair_f[i].animals[0].ts
+                ts = self.exp_set.experiments[j].pair_f[i].animals[0].ts
+                ts.yflip = self.yflip
+                ts.animal.neighbor.ts.yflip = self.yflip
+
                 speed = ts.speed_smooth()[:self.limit]
 
                 if swap_stim:
 
                     xy_rel = position_relative_to_neighbor_rot_alt_swapped(
-                        ts, frames_ep, window=self.smooth_alg, window_len=self.bout_wl)[:self.limit]
+                        ts, self.frames_ep, window=self.smooth_alg, window_len=self.smooth_wl)[:self.limit]
 
                 else:
 
-                    xy_rel = ts.position_relative_to_neighbor_rot_alt(window=self.smooth_alg, window_len=self.bout_wl).xy[:self.limit]
+                    xy_rel = ts.position_relative_to_neighbor_rot_alt(window=self.smooth_alg, window_len=self.smooth_wl).xy[:self.limit]
 
                 xy_pos = ts.position_smooth().xy[:self.limit]
-                hd_f = ts.heading(window=self.smooth_alg, window_len=self.bout_wl)
-                hd_s = ts.animal.neighbor.ts.heading(window=self.smooth_alg, window_len=self.bout_wl)
+                hd_f = ts.heading(window=self.smooth_alg, window_len=self.smooth_wl)
+                hd_s = ts.animal.neighbor.ts.heading(window=self.smooth_alg, window_len=self.smooth_wl)
 
                 stim_xys = list()
                 fish_xys = list()
@@ -776,7 +785,7 @@ class VectorFieldAnalysis:
                         stim_hd.append((hd_s[idx_pre], hd_s[idx_post]))
                         fish_hd.append((hd_f[idx_pre], hd_f[idx_post]))
 
-                    except IndexError:
+                    except:
 
                         print('Could not get pre/post bout idxs: ')
                         print(bout_idx)
@@ -785,10 +794,10 @@ class VectorFieldAnalysis:
                         stim_hd.append((np.nan, np.nan))
                         fish_hd.append((np.nan, np.nan))
 
-                    episode = an_episodes[int(bout_idx / frames_ep)]
+                    episode = an_episodes[int(bout_idx / self.frames_ep)]
                     bout_episodes.append((bout_idx, episode))
 
-                self.all_bout_xys[animal_idx] = {
+                all_bout_xys[animal_idx] = {
 
                     'stim_xys': stim_xys,
                     'fish_xys': fish_xys,
@@ -798,19 +807,22 @@ class VectorFieldAnalysis:
                     'group': an_group
 
                 }
-        return
 
-    def calc_bout_vectors(self):
+        pickle.dump(all_bout_xys, open(
+            os.path.join(self.base, 'all_bout_xys_{0}{1}.p'.format(self.expset_name, tag)), 'wb'))
+        return all_bout_xys
+
+    def calc_bout_vectors(self, all_bout_xys, tag=''):
 
         '''
         Calculate the distance of each bout, generate df containing all bout information
         '''
 
-        animal_idxs = sorted(self.all_bout_xys.keys())
+        animal_idxs = sorted(all_bout_xys.keys())
 
         # Bout vectors
-        self.fish_xys = np.array([fxy for anid in animal_idxs for fxy in self.all_bout_xys[anid]['fish_xys']])
-        self.stim_xys = np.array([sxy for anid in animal_idxs for sxy in self.all_bout_xys[anid]['stim_xys']])
+        self.fish_xys = np.array([fxy for anid in animal_idxs for fxy in all_bout_xys[anid]['fish_xys']])
+        self.stim_xys = np.array([sxy for anid in animal_idxs for sxy in all_bout_xys[anid]['stim_xys']])
 
         self.fish_vectors = np.concatenate([self.fish_xys[:, 0], self.fish_xys[:, 1] - self.fish_xys[:, 0]], axis=1)
         self.bout_vectors = np.concatenate([self.stim_xys[:, 0], self.stim_xys[:, 1] - self.stim_xys[:, 0]], axis=1)
@@ -820,8 +832,8 @@ class VectorFieldAnalysis:
         print('Mean distance per bout: ', np.nanmean(self.dist))
 
         # Absolute and relative heading
-        self.stim_hd = np.array([sxy for anid in animal_idxs for sxy in self.all_bout_xys[anid]['stim_hd']])
-        self.fish_hd = np.array([sxy for anid in animal_idxs for sxy in self.all_bout_xys[anid]['fish']])
+        self.stim_hd = np.array([sxy for anid in animal_idxs for sxy in all_bout_xys[anid]['stim_hd']])
+        self.fish_hd = np.array([sxy for anid in animal_idxs for sxy in all_bout_xys[anid]['fish_hd']])
         startdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(self.stim_hd[:, 0], self.fish_hd[:, 0])]
         stopdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(self.stim_hd[:, 1], self.fish_hd[:, 1])]
         diffdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(stopdiff, startdiff)]
@@ -829,13 +841,13 @@ class VectorFieldAnalysis:
 
         # Meta params
         bout_animal_idxs = np.concatenate(
-            [[anid] * len(self.all_bout_xys[anid]['stim_xys']) for anid in animal_idxs]
+            [[anid] * len(all_bout_xys[anid]['stim_xys']) for anid in animal_idxs]
             , axis=0)
         bout_groups = np.concatenate(
-            [[self.all_bout_xys[anid]['group']] * len(self.all_bout_xys[anid]['stim_xys']) for anid in animal_idxs]
+            [[all_bout_xys[anid]['group']] * len(all_bout_xys[anid]['stim_xys']) for anid in animal_idxs]
             , axis=0)
-        bout_episodes = np.array([ep[1] for anid in animal_idxs for ep in self.all_bout_xys[anid]['bout_episodes']])
-        bout_idxs = np.array([ep[0] for anid in animal_idxs for ep in self.all_bout_xys[anid]['bout_episodes']])
+        bout_episodes = np.array([ep[1] for anid in animal_idxs for ep in all_bout_xys[anid]['bout_episodes']])
+        bout_idxs = np.array([ep[0] for anid in animal_idxs for ep in all_bout_xys[anid]['bout_episodes']])
 
         self.bout_df = pd.DataFrame({
 
@@ -846,21 +858,20 @@ class VectorFieldAnalysis:
             'Bout index': bout_idxs
         })
         print('Shape of bout dataframe: ', self.bout_df.shape)
-        pickle.dump(self.bout_df, open(os.path.join(self.base, 'bout_df_{}.p'.format(self.expset_name)), 'wb'))
+        pickle.dump(self.bout_df, open(os.path.join(self.base, 'bout_df_{0}{1}.p'.format(self.expset_name, tag)), 'wb'))
+        del all_bout_xys
+
         return
 
     def extract_nmaps(self):
 
         """
         Extracting FILTERED neighborhood maps from each individual animal for all conditions
-
-        :param df:
-        :param map_paths:
         :return:
 
         """
 
-        n_animals = sum(self.n_animals_thresh)
+        n_animals = sum(self.n_animals_sess)
         # Filtered
         self.neighbormaps_bl = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
         self.neighbormaps_cont = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
@@ -872,9 +883,9 @@ class VectorFieldAnalysis:
                 print(self.map_paths[mapno])
                 tmp = np.load(self.map_paths[mapno])
                 print(tmp.shape, mapno)
-                tmpDf = df[df.animalSet == mapno]
-                for a in range(n_animals_sess[mapno]):
-                    an = sum(n_animals_sess[:mapno]) + a
+                tmpDf = self.df[self.df.animalSet == mapno]
+                for a in range(self.n_animals_sess[mapno]):
+                    an = sum(self.n_animals_sess[:mapno]) + a
                     print(an)
                     dfIdx = (tmpDf.episode == stimtype) & \
                             (tmpDf.animalID == a) & \
@@ -893,9 +904,9 @@ class VectorFieldAnalysis:
                 print(self.map_paths[mapno])
                 tmp = np.load(self.map_paths[mapno])
                 print(tmp.shape)
-                tmpDf = df[df.animalSet == mapno]
-                for a in range(n_animals_sess[mapno]):
-                    an = sum(n_animals_sess[:mapno]) + a
+                tmpDf = self.df[self.df.animalSet == mapno]
+                for a in range(self.n_animals_sess[mapno]):
+                    an = sum(self.n_animals_sess[:mapno]) + a
 
                     dfIdx = (tmpDf.episode == stimtype) & \
                             (tmpDf.animalID == a) & \
@@ -905,120 +916,108 @@ class VectorFieldAnalysis:
                     nmap[an, :, :] = np.nanmean(tmp[ix, 0, 1, :, :], axis=0)
         return
 
-    # def generate_mapdict(
-    #
-    #     self,
-    #     expset_names,
-    #     exclude_animals,
-    #     datapath='J:/_Projects/J-sq',
-    #     groupsets=(),
-    #     sortlogics=()
-    #
-    # ):
-    #     from collections import defaultdict as ddict
-    #     mapdict = {}
-    #     if isinstance(exclude_animals, dict):
-    #         exan = [idx for key in sorted(exclude_animals.keys()) for idx in exclude_animals[key]]
-    #     else:
-    #         exan = exclude_animals
-    #     if isinstance(expset_names, str):
-    #         expset_names = [expset_names]
-    #     maxsets = [0]
-    #
-    #     for sl in sortlogics:
-    #         mapdict[sl] = ddict(list)
-    #
-    #     nan = 0
-    #     nex = 0
-    #
-    #     for groupset in groupsets:
-    #
-    #         gset = '_'.join(groupset)
-    #         gskey_bl, gskey_cont = '_'.join([gset, '10k20f']), '_'.join([gset, '07k01f'])
-    #
-    #         print(gskey_bl)
-    #         for dno, dataset in enumerate(expset_names):
-    #
-    #             # Dataset # 1- indexed
-    #             gdkey_bl, gdkey_cont = '_'.join([gset, str(dno + 1), '10k20f']), '_'.join([gset, str(dno + 1), '07k01f'])
-    #
-    #             print(dataset, gdkey_bl)
-    #             maxset = len(glob.glob(datapath + '/' + dataset + '/*MapData.npy'))
-    #             df_ds = df_merged.loc[
-    #                 (maxsets[dno] <= df_merged.animalSet.values) & (df_merged.animalSet.values < maxsets[dno] + maxset)]
-    #             print(df_ds.animalIndex.unique().shape, '123')
-    #             print(maxsets[dno], maxset + maxsets[dno])
-    #             for group in groupset:
-    #
-    #                 if group not in df_ds.group.unique():
-    #                     print(group, 'not found')
-    #                     continue
-    #
-    #                 print(group)
-    #                 uan = df_ds.loc[df_ds.group == group].animalIndex.unique()
-    #
-    #                 print(group, uan.shape)
-    #                 grkey_bl, grkey_cont = '_'.join([group, '10k20f']), '_'.join([group, '07k01f'])
-    #                 grdkey_bl, grdkey_cont = '_'.join([group, str(dno + 1), '10k20f']), '_'.join(
-    #                     [group, str(dno + 1), '07k01f'])
-    #                 for an in uan:
-    #
-    #                     if an in exan:
-    #                         nex += 1
-    #                         nan += 1
-    #                         print('# animals ex', nex)
-    #
-    #                         continue
-    #
-    #                     nan += 1
-    #                     print('# animals', nan)
-    #                     nmap_bl = neighbormaps_bl[an - 1]
-    #                     nmap_cont = neighbormaps_cont[an - 1]
-    #                     # flip because of UP/DOWN confusion in the raw data acquisition
-    #
-    #                     for sl in sortlogics:
-    #
-    #                         if sl not in ['dsetwise-gset', 'gsetwise']:
-    #
-    #                             mapdict[sl][grkey_bl].append(np.flipud(nmap_bl))
-    #                             mapdict[sl][grkey_cont].append(np.flipud(nmap_cont))
-    #
-    #                         else:
-    #
-    #                             if not group.endswith('L'):
-    #
-    #                                 nmap_bl = np.flipud(nmap_bl)
-    #                                 nmap_cont = np.flipud(nmap_cont)
-    #
-    #                             mapdict[sl][gdkey_bl].append(nmap_bl)
-    #                             mapdict[sl][gdkey_cont].append(nmap_cont)
-    #
-    #             maxsets.append(maxset)
-    #     pickle.dump(mapdict,
-    #                 open(os.path.join(base, 'mapdict_{}.p'.format(dataset)),
-    #                      'wb'))
-    #     return mapdict
+    def generate_mapdict(self, tag=''):
 
-    def collect_vector_hists(self):
+        self.mapdict = {}
+        for sl in self.sortlogics:
+            self.mapdict[sl] = ddict(list)
+
+        nan = 0
+        nex = 0
+
+        if self.groupsets == []:
+
+            groups = sorted(self.bout_df.Group.unique())
+            self.groupsets = [[group] for group in groups]
+
+        for groupset in self.groupsets:
+
+            if len(groupset) > 1:
+                gset = '_'.join(groupset)
+                gskey_bl, gskey_cont = '_'.join([gset, '10k20f']), '_'.join([gset, '07k01f'])
+            else:
+                if 'gsetwise' in self.sortlogics:
+                    print('gsetwise in sortlogics but no groupsets defined')
+                    pass
+                else:
+                    pass
+
+            for group in groupset:
+
+                if group not in self.df.group.unique():
+                    print(group, 'not found')
+                    continue
+
+                anids = sorted(self.df.loc[self.df.group == group].animalIndex.unique())
+                print(group, len(list(anids)))
+
+                grkey_bl, grkey_cont = '_'.join([group, '10k20f']), '_'.join([group, '07k01f'])
+                for an in anids:
+
+                    if an in self.exclude_animals:
+
+                        nex += 1
+                        nan += 1
+                        print('# animals ex', nex)
+
+                        continue
+
+                    nan += 1
+                    print('# animals', nan)
+                    nmap_bl = self.neighbormaps_bl[an - 1]
+                    nmap_cont = self.neighbormaps_cont[an - 1]
+
+                    # yflip because of UP/DOWN confusion in the raw data acquisition
+                    # TODO: implement yflip in the nmap calculation
+                    if self.yflip:
+
+                        nmap_bl = np.flipud(nmap_bl)
+                        nmap_cont = np.flipud(nmap_cont)
+
+                    for sl in self.sortlogics:
+
+                        if sl == 'groupwise':
+
+                            self.mapdict[sl][grkey_bl].append(nmap_bl)
+                            self.mapdict[sl][grkey_cont].append(nmap_cont)
+
+                        elif sl == 'gsetwise':
+
+                            if self.revtag:
+
+                                if group.endswith(self.revtag):
+
+                                    nmap_bl = np.flipud(nmap_bl)
+                                    nmap_cont = np.flipud(nmap_cont)
+
+                            self.mapdict[sl][gskey_bl].append(nmap_bl)
+                            self.mapdict[sl][gskey_cont].append(nmap_cont)
+
+        pickle.dump(self.mapdict,
+                    open(os.path.join(self.base, 'mapdict_{0}{1}.p'.format(self.expset_name, tag)),
+                         'wb'))
+        return
+
+    def collect_vector_hists(self, tag=''):
 
         bin_edges = [self.edges_pos, self.edges_pos, self.edges_angles, self.edges_dists]
-        bin_edges = [np.linspace(b[0], b[1], res[bno] + 1) for bno, b in enumerate(bin_edges)]
+        bin_edges = [np.linspace(b[0], b[1], self.vmap_res[bno] + 1) for bno, b in enumerate(bin_edges)]
 
         self.histograms = {}
 
-        for sl in sortlogics:
+        for sl in self.sortlogics:
 
             self.histograms[sl] = ddict(list)
 
-        episodes = bout_df['Episode'].unique()
-        distances = bout_df['Bout distance'].values
+        episodes = self.bout_df['Episode'].unique()
+        distances = self.bout_df['Bout distance'].values
 
         for groupset in self.groupsets:
 
             print('Groupset: ', groupset)
             for group in groupset:
 
-                anids = bout_df[(bout_df['Group'] == group)]['Animal index'].unique()
+                anids = self.bout_df[(self.bout_df['Group'] == group)]['Animal index'].unique()
 
                 print('Group: ', group)
                 for anid in anids:
@@ -1028,11 +1027,11 @@ class VectorFieldAnalysis:
 
                         print('Episode: ', episode)
                         thresh = (
-                                (self.dist_filter[0] < bout_df['Bout distance'])
-                                & (self.dist_filter[1] > bout_df['Bout distance'])
-                                & (bout_df['Group'] == group)
-                                & (bout_df['Animal index'] == anid)
-                                & (bout_df['Episode'] == episode)
+                                (self.dist_filter[0] < self.bout_df['Bout distance'])
+                                & (self.dist_filter[1] > self.bout_df['Bout distance'])
+                                & (self.bout_df['Group'] == group)
+                                & (self.bout_df['Animal index'] == anid)
+                                & (self.bout_df['Episode'] == episode)
                         )
 
                         vectors_thresh = self.bout_vectors[np.where(thresh)].copy()
@@ -1054,23 +1053,22 @@ class VectorFieldAnalysis:
 
                             distances_thresh = np.sqrt(vectors_thresh[:, 3] ** 2 + vectors_thresh[:, 2] ** 2)
 
-
                         hist, uv_stats = calc_stats(
 
                             vectors_thresh,
                             bin_edges,
                             dist=distances_thresh,
-                            angles=angles,
+                            angles=True,
 
                         )
                         if self.revtag:
-                            if  'gsetwise' in sortlogics:
+                            if 'gsetwise' in self.sortlogics:
                                 hist_rev, uv_stats_rev = calc_stats(
 
                                     vectors_thresh_rev,
                                     bin_edges,
                                     dist=distances_thresh,
-                                    angles=angles,
+                                    angles=True,
 
                                 )
 
@@ -1121,7 +1119,8 @@ class VectorFieldAnalysis:
                         print('Unique hist vals: ', np.unique(hist).shape[0])
                         del vectors_thresh
 
-        pickle.dump(self.histograms, open(os.path.join(self.base, 'histograms_{}.p'.format(self.expset_name)), 'wb'))
+        pickle.dump(self.histograms,
+                    open(os.path.join(self.base, 'histograms_{0}{1}.p'.format(self.expset_name, tag)), 'wb'))
 
     def plot_vfs_ind(
 
@@ -1378,121 +1377,179 @@ class VectorFieldAnalysis:
 
 if __name__ == "__main__":
 
-    for_jl = False
-    # boolean for real data, y-axis flippled
-    yflip = True
-    load_data = False
-    root = 'C:/Users/jkappel/PyCharmProjects/jlsocialbehavior/jlsocialbehavior'
-    if for_jl:
+    ops = {
 
-        # If you fill in the exp_set and the respective dataframe here as well as the n_animals_sess and frames_ep,
-        # it might just run through with some tweaking, at least until the generation of the histograms. Further explanation
-        # for the variables can be found in generate_bout_vectors
+        'base': 'J:/_Projects/J-sq',
+        'expset_name': 'jjAblationsBilateral',
+        'stim_protocol': 'boutVsSmooth_grateloom',
+        'tag': '',
+        'swap_stim': False,
+        'shift': False,
+        'yflip': True,
+        'default_limit': None, # CARFUL HERE, No False!!!
+        'load_expset': False,
+        'cam_height': [105, 180],
+        'fps': 30,
 
-        exp_set = ...
-        n_animals_sess = [15, 15, 15]
-        df = ...
-        frames_ep = 9000
+        'bout_crop': 25,
+        'smooth_wl': 20,
+        'smooth_alg': 'hamming',
+        'unique_episodes': ['07k01f', '10k20f'],
+        'groupsets': [],
+        'sortlogics': ['groupwise'],
 
-        all_bout_xys, bout_df = generate_bout_vectors(
+        'nmap_res': (30, 30),
+        'dist_filter': (0, 30),
+        'edges_pos': (-20, 20),
+        'edges_dir': (-12, 12),
+        'edges_angles': (-np.pi, np.pi),
+        'edges_dists': (0, 30),
+        'vmap_res': (30, 30, 30, 30),
+        'revtag': 'L',
+        'abs_dist': True,
 
-            exp_set,
-            n_animals_sess,
-            df,
-            frames_ep
+        # experiment set parameters
+        'epiDur': 5,
+        'n_episodes': 60,
+        'inDish': 10,
+        'arenaDiameter_mm': 100,
+        'minShift': 60,
+        'episodePLcode': 0,
+        'recomputeAnimalSize': 0,
+        'SaveNeighborhoodMaps': 1,
+        'computeLeadership': 0,
+        'computeBouts': 0,
+        'nShiftRuns': 3,
+        'filteredMaps': True
 
-        )
+    }
+    abl_b = VectorFieldAnalysis(**ops)
+    abl_b.process_dataset()
 
-        bout_vectors, hd_merged, df_merged = merge_datasets(
+    ops['expset_name'] = 'jjAblations'
 
-            root=root,
-            expset_merge=[['Data1', 'Data2']]
-        )
+    abl_b = VectorFieldAnalysis(**ops)
+    abl_b.process_dataset()
 
-    elif load_data:
+    ops['expset_name'] = 'jjAblationsGratingLoom'
 
-        mergeset = ['jjAblations_shifted_smooth_rot', 'jjAblationsGratingLoom_shifted_smooth_rot']
-        bout_vectors = pickle.load(open(os.path.join(root, 'bout_vectors_{}.p'.format(''.join(mergeset))), 'rb'))
-        bout_df = pickle.load(open(os.path.join(root, 'bout_df_{}.p'.format(''.join(mergeset))), 'rb'))
-        hd_merged = pickle.load(open(os.path.join(root, 'hd_diff_{}.p'.format(''.join(mergeset))), 'rb'))
-
-    else:
-
-        # base = analyse_datasets(
-        #
-        #     expset_names=('jjAblations', 'jjAblationsGratingLoom'),
-        #     stim_protocols=('boutVsSmooth', 'boutVsSmooth_grateloom'),
-        #     default_limit=300*30*60,
-        #     load_expset=True
-        #
-        # )
-        #mergeset = ['jjAblations_smooth_rot', 'jjAblationsGratingLoom_smooth_rot']
+    abl_b = VectorFieldAnalysis(**ops)
+    abl_b.process_dataset()
 
 
-        base = r'J:/_Projects/J-sq'
-        base = process_datasets(
-            expset_names=['jjAblationsBilateral'],
-            stim_protocols=['boutVsSmooth_grateloom'],
-            tag='',
-            shift=False,
-            swap_stim=False
-        )
-        mergeset = ['jjAblationsBilateral']
-        bout_vectors, hd_merged, bout_df = merge_datasets(
 
-            expset_merge=[mergeset],
-            root=base
-        )
 
-    # switching sign of the first dimension due to flipping of y axis in the data preprocessing
-    if yflip:
 
-        bout_vectors[:, 0] *= -1
-        bout_vectors[:, 2] *= -1
 
-    dist_types = ['abs']
-    #sortlogics = ['gsetwise', 'dsetwise-gset', 'dsetwise-group']
+
+
+
+
+    # for_jl = False
+    # # boolean for real data, y-axis flippled
+    # yflip = True
+    # load_data = False
+    # root = 'C:/Users/jkappel/PyCharmProjects/jlsocialbehavior/jlsocialbehavior'
+    # if for_jl:
+    #
+    #     # If you fill in the exp_set and the respective dataframe here as well as the n_animals_sess and frames_ep,
+    #     # it might just run through with some tweaking, at least until the generation of the histograms. Further explanation
+    #     # for the variables can be found in generate_bout_vectors
+    #
+    #     exp_set = ...
+    #     n_animals_sess = [15, 15, 15]
+    #     df = ...
+    #     frames_ep = 9000
+    #
+    #     all_bout_xys, bout_df = generate_bout_vectors(
+    #
+    #         exp_set,
+    #         n_animals_sess,
+    #         df,
+    #         frames_ep
+    #
+    #     )
+    #
+    #     bout_vectors, hd_merged, df_merged = merge_datasets(
+    #
+    #         root=root,
+    #         expset_merge=[['Data1', 'Data2']]
+    #     )
+    #
+    # elif load_data:
+    #
+    #     mergeset = ['jjAblations_shifted_smooth_rot', 'jjAblationsGratingLoom_shifted_smooth_rot']
+    #     bout_vectors = pickle.load(open(os.path.join(root, 'bout_vectors_{}.p'.format(''.join(mergeset))), 'rb'))
+    #     bout_df = pickle.load(open(os.path.join(root, 'bout_df_{}.p'.format(''.join(mergeset))), 'rb'))
+    #     hd_merged = pickle.load(open(os.path.join(root, 'hd_diff_{}.p'.format(''.join(mergeset))), 'rb'))
+    #
+    # else:
+    #
+    #     # base = analyse_datasets(
+    #     #
+    #     #     expset_names=('jjAblations', 'jjAblationsGratingLoom'),
+    #     #     stim_protocols=('boutVsSmooth', 'boutVsSmooth_grateloom'),
+    #     #     default_limit=300*30*60,
+    #     #     load_expset=True
+    #     #
+    #     # )
+    #     #mergeset = ['jjAblations_smooth_rot', 'jjAblationsGratingLoom_smooth_rot']
+    #
+    #
+    #     base = r'J:/_Projects/J-sq'
+    #     base = process_datasets(
+    #         expset_names=['jjAblationsBilateral'],
+    #         stim_protocols=['boutVsSmooth_grateloom'],
+    #         tag='',
+    #         shift=False,
+    #         swap_stim=False
+    #     )
+    #     mergeset = ['jjAblationsBilateral']
+    #     bout_vectors, hd_merged, bout_df = merge_datasets(
+    #
+    #         expset_merge=[mergeset],
+    #         root=base
+    #     )
+    #
+    # # switching sign of the first dimension due to flipping of y axis in the data preprocessing
+    # if yflip:
+    #
+    #     bout_vectors[:, 0] *= -1
+    #     bout_vectors[:, 2] *= -1
+    #
+    #
+    # sortlogics = ['groupwise', 'dsetwise-group']
     # groupsets = [
     #
-    #     ['LsR', 'LsL'],
-    #     ['AblR', 'AblL'],
-    #     ['CtrR', 'CtrL'],
-    #     ['ctr', 'wt']
+    #     ['CtrE'],
+    #     ['AblB'],
+    #     ['Bv']
     #
     # ]
-
-    sortlogics = ['groupwise', 'dsetwise-group']
-    groupsets = [
-
-        ['CtrE'],
-        ['AblB'],
-        ['Bv']
-
-    ]
-    for dist_type, res, angles in zip(dist_types, [(30, 30, 90, 90, 90)], [True]):
-        print(hd_merged.shape)
-        hists, _ = collect_stats(
-            bout_df,
-            bout_vectors,
-            groupsets=groupsets,
-            sortlogics=sortlogics,
-            statistic=None,
-            statvals=None,
-            hd_hist=False,
-            rel_stim_hd=hd_merged[:, 0],
-            angles=angles,
-            dist_type=dist_type,
-            dist_filter=(0, 30),
-            edges_pos=(-20, 20),
-            edges_dir=(-12, 12),
-            edges_angles=(-np.pi, np.pi),
-            edges_dists=(0, 30),
-            res=res
-        )
-
-        pickle.dump(hists, open(os.path.join(base, 'histograms_{}_{}_{}_dict.p'.format(
-            ''.join(mergeset),
-            ('_').join(sortlogics),
-            dist_type)), 'wb'))
+    # for dist_type, res, angles in zip(dist_types, [(30, 30, 90, 90, 90)], [True]):
+    #     print(hd_merged.shape)
+    #     hists, _ = collect_stats(
+    #         bout_df,
+    #         bout_vectors,
+    #         groupsets=groupsets,
+    #         sortlogics=sortlogics,
+    #         statistic=None,
+    #         statvals=None,
+    #         hd_hist=False,
+    #         rel_stim_hd=hd_merged[:, 0],
+    #         angles=angles,
+    #         dist_type=dist_type,
+    #         dist_filter=(0, 30),
+    #         edges_pos=(-20, 20),
+    #         edges_dir=(-12, 12),
+    #         edges_angles=(-np.pi, np.pi),
+    #         edges_dists=(0, 30),
+    #         res=res
+    #     )
+    #
+    #     pickle.dump(hists, open(os.path.join(base, 'histograms_{}_{}_{}_dict.p'.format(
+    #         ''.join(mergeset),
+    #         ('_').join(sortlogics),
+    #         dist_type)), 'wb'))
 
 
