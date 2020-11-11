@@ -246,6 +246,7 @@ def position_relative_to_neighbor_rot_alt_swapped(
 
     return x
 
+
 def plot_vector_field(
 
         ax,
@@ -554,6 +555,7 @@ class VectorFieldAnalysis:
 
         for index, row in info.iterrows():
 
+            print(self.base, self.expset_name, row.path)
             start_dir = os.path.join(self.base, self.expset_name, row.path)
             print(start_dir)
             posPath.append(glob.glob(start_dir + '/PositionTxt*.txt')[0])
@@ -615,7 +617,7 @@ class VectorFieldAnalysis:
 
         csvPath = []
         mapPath = []
-
+        print([mu.splitall(x)[-1][:-4] for x in info.txtPath])
         for f in sorted([mu.splitall(x)[-1][:-4] for x in info.txtPath]):
 
             csvPath.append(glob.glob(os.path.join(self.base, f + '*siSummary*.csv'))[0])
@@ -749,8 +751,11 @@ class VectorFieldAnalysis:
                     self.exp_set.experiments[j].pair_f[i].shift = [self.exp_set.experiments[j].shiftList[0], 0]
 
                 ts = self.exp_set.experiments[j].pair_f[i].animals[0].ts
+
+                print(ts.yflip, 'ts yflip attribute')
                 ts.yflip = self.yflip
                 ts.animal.neighbor.ts.yflip = self.yflip
+                print(ts.yflip, 'ts yflip attribute')
 
                 speed = ts.speed_smooth()[:self.limit]
 
@@ -1122,264 +1127,264 @@ class VectorFieldAnalysis:
         pickle.dump(self.histograms,
                     open(os.path.join(self.base, 'histograms_{0}{1}.p'.format(self.expset_name, tag)), 'wb'))
 
-    def plot_vfs_ind(
 
-            self,
-            histograms_abs,
-            mapdict,
-            sortlogic='dsetwise',
-            tag='',
-            edges_pos=(-20, 20),
-            edges_dir=(-12, 12),
-            edges_angles=(-np.pi, np.pi),
-            edges_dists=(0, 30),
-            res_abs=(30, 30, 90, 90),
-            res_rel=(30, 30, 45, 45),
-            clim=(0.5, 2.),
-            clim_diff=(-.4, .4),
-            clim_nmap=(-1, 2),
-            cmap='RdPu',
-            cmap_diff='coolwarm',
-            cmap_nmap='shiftedcwm',
-            width=0.25,
-            scale_abs=2,
-            scale_rel=1,
-            sigma=2,
-            alpha=.7,
-            maxp=False,
-            show=False,
-            ctr='CtrE'
+def plot_vfs_ind(
 
-    ):
-        vector_xys_abs = {}
-        vector_xys_rel = {}
+        histograms_abs,
+        mapdict,
+        sortlogic='groupwise',
+        tag='',
+        edges_pos=(-20, 20),
+        edges_dir=(-12, 12),
+        edges_angles=(-np.pi, np.pi),
+        edges_dists=(0, 30),
+        res_abs=(30, 30, 90, 90),
+        res_rel=(30, 30, 45, 45),
+        clim=(0.5, 2.),
+        clim_diff=(-.4, .4),
+        clim_nmap=(-1, 2),
+        cmap='RdPu',
+        cmap_diff='coolwarm',
+        cmap_nmap='shiftedcwm',
+        width=0.25,
+        scale_abs=2,
+        scale_rel=1,
+        sigma=2,
+        alpha=.7,
+        maxp=False,
+        show=False,
+        ctr='CtrE'
 
-        be_abs = [np.linspace(b[0], b[1], res_abs[bno] + 1) for bno, b in enumerate([
-            edges_pos, edges_pos, edges_angles, edges_dists])]
+):
+    vector_xys_abs = {}
+    vector_xys_rel = {}
 
-        be_rel = [np.linspace(b[0], b[1], res_rel[bno] + 1) for bno, b in enumerate([
-            edges_pos, edges_pos, edges_dir, edges_dir])]
+    be_abs = [np.linspace(b[0], b[1], res_abs[bno] + 1) for bno, b in enumerate([
+        edges_pos, edges_pos, edges_angles, edges_dists])]
 
-        groupsets = sorted(histograms_abs.keys())
+    be_rel = [np.linspace(b[0], b[1], res_rel[bno] + 1) for bno, b in enumerate([
+        edges_pos, edges_pos, edges_dir, edges_dir])]
 
-        for gno, groupset in enumerate(groupsets):
+    groupsets = sorted(histograms_abs.keys())
 
-            fig = plt.figure(figsize=(12, 4), dpi=200)
-            gs = gridspec.GridSpec(nrows=1, ncols=5, width_ratios=[1, 1, 1, .1, .1], height_ratios=[1])
-            gs.update(wspace=0.8, hspace=0.4)
+    for gno, groupset in enumerate(groupsets):
 
-            print(groupset, len(histograms_abs[groupset]))
-            hist_abs = np.mean([histogram / np.sum(histogram) for histogram in histograms_abs[groupset]], axis=0)
-            n = len(histograms_abs[groupset])
-            print(hist_abs.shape, hist_abs.min(), hist_abs.max())
-            print(np.where(np.isnan(hist_abs))[0].shape)
-            if '07' in groupset:
+        fig = plt.figure(figsize=(12, 4), dpi=200)
+        gs = gridspec.GridSpec(nrows=1, ncols=5, width_ratios=[1, 1, 1, .1, .1], height_ratios=[1])
+        gs.update(wspace=0.8, hspace=0.4)
 
-                label = '_'.join(groupset.split('_')[:-1]) + ' continuous' + ', n=' + str(n)
+        print(groupset, len(histograms_abs[groupset]))
+        hist_abs = np.mean([histogram / np.sum(histogram) for histogram in histograms_abs[groupset]], axis=0)
+        n = len(histograms_abs[groupset])
+        print(hist_abs.shape, hist_abs.min(), hist_abs.max())
+        print(np.where(np.isnan(hist_abs))[0].shape)
+        if '07' in groupset:
 
-            else:
+            label = '_'.join(groupset.split('_')[:-1]) + ' continuous' + ', n=' + str(n)
 
-                label = '_'.join(groupset.split('_')[:-1]) + ' bout-like' + ', n=' + str(n)
+        else:
 
-            episode = groupset.split('_')[-1]
-            ax0 = plt.subplot(gs[0, 2])
-            angles_abs, dists_abs, diffx, diffy, hist_pos = plot_vector_field(
+            label = '_'.join(groupset.split('_')[:-1]) + ' bout-like' + ', n=' + str(n)
 
-                ax0,
-                hist_abs,
-                res_abs,
-                be_abs,
-                width=width,
-                scale=scale_abs,
-                sigma=sigma,
-                cmap='coolwarm',
-                clim=clim,
-                angles=True,
-                angles_plot='xy',
-                scale_units='xy',
-                maxp=maxp,
-                alpha=alpha
-            )
+        episode = groupset.split('_')[-1]
+        ax0 = plt.subplot(gs[0, 2])
+        angles_abs, dists_abs, diffx, diffy, hist_pos = plot_vector_field(
 
-            nmap = np.nanmean(mapdict[sortlogic][groupset], axis=0)
-            vector_xys_abs[groupset] = (diffx, diffy, angles_abs, dists_abs, hist_pos, nmap)
-            ax1 = plt.subplot(gs[0, 0])
-            nmap_im = ax1.imshow(nmap.T, origin='lower', cmap=cmap_nmap, clim=clim_nmap, extent=(-19.5, 20.5, -19.5, 20.5))
-            ax1.set_xlim(-19.5, 20.5)
-            ax1.set_ylim(-19.5, 20.5)
-            ax1.set_ylabel(label)
-            ax2 = plt.subplot(gs[0, 1])
-            bp_im = ax2.imshow(hist_pos.T, origin='lower', clim=clim, extent=(-19.5, 20.5, -19.5, 20.5), cmap=cmap)
-            ax2.set_xlim(-19.5, 20.5)
-            ax2.set_ylim(-19.5, 20.5)
-            ax3 = plt.subplot(gs[0, 3])
-            sm = plt.cm.ScalarMappable(cmap=plt.cm.coolwarm, norm=plt.Normalize(vmin=-180, vmax=180))
-            # fake up the array of the scalar mappable
-            sm._A = []
-            clb = plt.colorbar(sm, cax=ax3, use_gridspec=True, label='Relative bout angle', pad=.2)
+            ax0,
+            hist_abs,
+            res_abs,
+            be_abs,
+            width=width,
+            scale=scale_abs,
+            sigma=sigma,
+            cmap='coolwarm',
+            clim=clim,
+            angles=True,
+            angles_plot='xy',
+            scale_units='xy',
+            maxp=maxp,
+            alpha=alpha
+        )
 
-            ax4 = plt.subplot(gs[0, 4])
-            clb = plt.colorbar(nmap_im, cax=ax4, use_gridspec=True, label='Fold-change from chance', pad=.2)
+        nmap = np.nanmean(mapdict[sortlogic][groupset], axis=0)
+        vector_xys_abs[groupset] = (diffx, diffy, angles_abs, dists_abs, hist_pos, nmap)
+        ax1 = plt.subplot(gs[0, 0])
+        nmap_im = ax1.imshow(nmap.T, origin='lower', cmap=cmap_nmap, clim=clim_nmap, extent=(-19.5, 20.5, -19.5, 20.5))
+        ax1.set_xlim(-19.5, 20.5)
+        ax1.set_ylim(-19.5, 20.5)
+        ax1.set_ylabel(label)
+        ax2 = plt.subplot(gs[0, 1])
+        bp_im = ax2.imshow(hist_pos.T, origin='lower', clim=clim, extent=(-19.5, 20.5, -19.5, 20.5), cmap=cmap)
+        ax2.set_xlim(-19.5, 20.5)
+        ax2.set_ylim(-19.5, 20.5)
+        ax3 = plt.subplot(gs[0, 3])
+        sm = plt.cm.ScalarMappable(cmap=plt.cm.coolwarm, norm=plt.Normalize(vmin=-180, vmax=180))
+        # fake up the array of the scalar mappable
+        sm._A = []
+        clb = plt.colorbar(sm, cax=ax3, use_gridspec=True, label='Relative bout angle', pad=.2)
 
-            ax3.yaxis.set_label_position('left')
-            ax4.yaxis.set_label_position('left')
-            for ax in [ax0, ax1, ax2]:
-                ax.set_aspect('equal')
+        ax4 = plt.subplot(gs[0, 4])
+        clb = plt.colorbar(nmap_im, cax=ax4, use_gridspec=True, label='Fold-change from chance', pad=.2)
 
-            ax0.set_title('Bout vector field')
-            ax1.set_title('Neighbor density')
-            ax2.set_title('Bout probability')
-            plt.savefig('{}_plot0_{}.png'.format(groupset, tag), bbox_inches='tight')
+        ax3.yaxis.set_label_position('left')
+        ax4.yaxis.set_label_position('left')
+        for ax in [ax0, ax1, ax2]:
+            ax.set_aspect('equal')
 
-            if show:
+        ax0.set_title('Bout vector field')
+        ax1.set_title('Neighbor density')
+        ax2.set_title('Bout probability')
+        plt.savefig('{}_plot0_{}.png'.format(groupset, tag), bbox_inches='tight')
 
-                plt.show()
+        if show:
 
-            else:
+            plt.show()
 
-                plt.close()
+        else:
 
-        scales = [scale_abs, scale_rel]
-        for gno, groupset in enumerate(groupsets):
+            plt.close()
 
-            dset = re.findall('_\d+_', groupset)
-            print(groupset, dset)
-            if len(dset) == 0:
+    scales = [scale_abs, scale_rel]
+    for gno, groupset in enumerate(groupsets):
 
-                dset = ''
+        dset = re.findall('_\d+_', groupset)
+        print(groupset, dset)
+        if len(dset) == 0:
 
-            else:
+            dset = ''
 
-                dset = dset[0][:-1]
+        else:
 
-            wt_bl = '{}{}_10k20f'.format(ctr, dset)
-            wt_cont = '{}{}_07k01f'.format(ctr, dset)
-            print(wt_bl, wt_cont)
-            diffx_abs, diffy_abs, angles_abs, dists_abs, hist_abs, nmap = vector_xys_abs[groupset]
-            # dists_rel = np.sqrt(vector_xys_rel[groupset][0] ** 2 + vector_xys_rel[groupset][1] ** 2)
+            dset = dset[0][:-1]
 
-            if groupset == wt_bl or '07k01f' in groupset and not ctr in groupset:
+        wt_bl = '{}{}_10k20f'.format(ctr, dset)
+        wt_cont = '{}{}_07k01f'.format(ctr, dset)
+        print(wt_bl, wt_cont)
+        diffx_abs, diffy_abs, angles_abs, dists_abs, hist_abs, nmap = vector_xys_abs[groupset]
+        # dists_rel = np.sqrt(vector_xys_rel[groupset][0] ** 2 + vector_xys_rel[groupset][1] ** 2)
 
-                diffx_cont, diffy_cont, angles_cont, _, hist_cont, nmap_cont = vector_xys_abs[wt_cont]
-                # dists_cont = np.sqrt(vector_xys_rel[wt_cont][0] ** 2 + vector_xys_rel[wt_cont][1] ** 2)
+        if groupset == wt_bl or '07k01f' in groupset and not ctr in groupset:
 
-                diffangles = np.array([calc_anglediff(i, j, theta=np.pi) for i, j in zip(angles_abs, angles_cont)])
-                print(angles_abs.shape, angles_cont.shape, diffangles.shape)
-                print(len(diffangles), diffangles[0].shape)
-                # diffdists = dists_rel - dists_cont
-                hist_pos = hist_abs - hist_cont
-                diffdensity = nmap - nmap_cont
-            else:
+            diffx_cont, diffy_cont, angles_cont, _, hist_cont, nmap_cont = vector_xys_abs[wt_cont]
+            # dists_cont = np.sqrt(vector_xys_rel[wt_cont][0] ** 2 + vector_xys_rel[wt_cont][1] ** 2)
 
-                diffx_bl, diffy_bl, angles_bl, _, hist_bl, nmap_bl = vector_xys_abs[wt_bl]
-                # dists_bl = np.sqrt(vector_xys_rel[wt_bl][0] ** 2 + vector_xys_rel[wt_bl][1] ** 2)
+            diffangles = np.array([calc_anglediff(i, j, theta=np.pi) for i, j in zip(angles_abs, angles_cont)])
+            print(angles_abs.shape, angles_cont.shape, diffangles.shape)
+            print(len(diffangles), diffangles[0].shape)
+            # diffdists = dists_rel - dists_cont
+            hist_pos = hist_abs - hist_cont
+            diffdensity = nmap - nmap_cont
+        else:
 
-                diffangles = np.array(
-                    [calc_anglediff(i, j, theta=np.pi) for i, j in zip(angles_abs, angles_bl)])
-                # diffdists = dists_rel - dists_bl
-                hist_pos = hist_abs - hist_bl
-                diffdensity = nmap - nmap_bl
+            diffx_bl, diffy_bl, angles_bl, _, hist_bl, nmap_bl = vector_xys_abs[wt_bl]
+            # dists_bl = np.sqrt(vector_xys_rel[wt_bl][0] ** 2 + vector_xys_rel[wt_bl][1] ** 2)
 
-            fig = plt.figure(figsize=(12, 4), dpi=200)
-            gs = gridspec.GridSpec(nrows=1, ncols=5, width_ratios=[1, 1, 1, .1, .1], height_ratios=[1])
-            gs.update(wspace=0.8, hspace=0.4)
+            diffangles = np.array(
+                [calc_anglediff(i, j, theta=np.pi) for i, j in zip(angles_abs, angles_bl)])
+            # diffdists = dists_rel - dists_bl
+            hist_pos = hist_abs - hist_bl
+            diffdensity = nmap - nmap_bl
 
-            ax5 = plt.subplot(gs[0, 0])
-            bin_values = [bins[:-1] + (bins[1] - bins[0]) for bins in be_abs[:2]]
-            #         x1, x2 = np.meshgrid(bin_values[0], bin_values[1])
-            #         ax5.quiver(x1, x2, x1/x1, x2/x2,
-            #                    diffangles,
-            #                    #clim=clim_diff,
-            #                    cmap='coolwarm',
-            #                    units='xy',
-            #                    angles=np.rad2deg(diffangles)-90,
-            #                    scale_units=None,
-            #                    scale=1,
-            #                    width=width,
-            #                    alpha=alpha
-            #                  )
-            ax5.imshow(diffangles.reshape(30, 30), origin='lower', cmap='coolwarm')
-            ax5.set_aspect('equal')
+        fig = plt.figure(figsize=(12, 4), dpi=200)
+        gs = gridspec.GridSpec(nrows=1, ncols=5, width_ratios=[1, 1, 1, .1, .1], height_ratios=[1])
+        gs.update(wspace=0.8, hspace=0.4)
 
-            if gno == 0:
-                ax5.set_title('Δ Angles')
-            ax6 = plt.subplot(gs[0, 1])
-            im_diffd = ax6.imshow(
-                diffdensity.T,
-                origin='lower',
-                cmap='coolwarm',
-                clim=clim_diff,
-                extent=(-29.5, 30.5, -29.5, 30.5)
+        ax5 = plt.subplot(gs[0, 0])
+        bin_values = [bins[:-1] + (bins[1] - bins[0]) for bins in be_abs[:2]]
+        #         x1, x2 = np.meshgrid(bin_values[0], bin_values[1])
+        #         ax5.quiver(x1, x2, x1/x1, x2/x2,
+        #                    diffangles,
+        #                    #clim=clim_diff,
+        #                    cmap='coolwarm',
+        #                    units='xy',
+        #                    angles=np.rad2deg(diffangles)-90,
+        #                    scale_units=None,
+        #                    scale=1,
+        #                    width=width,
+        #                    alpha=alpha
+        #                  )
+        ax5.imshow(diffangles.reshape(30, 30), origin='lower', cmap='coolwarm')
+        ax5.set_aspect('equal')
 
-            )
-            ax6.set_xlim(-19.5, 20.5)
-            ax6.set_ylim(-19.5, 20.5)
+        if gno == 0:
+            ax5.set_title('Δ Angles')
+        ax6 = plt.subplot(gs[0, 1])
+        im_diffd = ax6.imshow(
+            diffdensity.T,
+            origin='lower',
+            cmap='coolwarm',
+            clim=clim_diff,
+            extent=(-29.5, 30.5, -29.5, 30.5)
 
-            ax6.set_title('Δ Neighbor density')
+        )
+        ax6.set_xlim(-19.5, 20.5)
+        ax6.set_ylim(-19.5, 20.5)
 
-            ax7 = plt.subplot(gs[0, 2])
-            ax8 = plt.subplot(gs[0, 3])
-            ax9 = plt.subplot(gs[0, 4])
+        ax6.set_title('Δ Neighbor density')
 
-            ax7.set_title('Δ Bout probability')
+        ax7 = plt.subplot(gs[0, 2])
+        ax8 = plt.subplot(gs[0, 3])
+        ax9 = plt.subplot(gs[0, 4])
 
-            im = ax7.imshow(hist_pos.T, origin='lower', clim=clim_diff, extent=(-19.5, 20.5, -19.5, 20.5), cmap=cmap_diff)
-            clb = plt.colorbar(im_diffd, cax=ax8, use_gridspec=True, label='Δ Fold-change ND', pad=.2)
-            ax8.yaxis.set_label_position('left')
+        ax7.set_title('Δ Bout probability')
 
-            clb = plt.colorbar(im, cax=ax9, use_gridspec=True, label='Δ Fold-change BP', pad=.2)
-            ax9.yaxis.set_label_position('left')
-            plt.savefig('{}_plot1_{}.png'.format(groupset, tag), bbox_inches='tight')
+        im = ax7.imshow(hist_pos.T, origin='lower', clim=clim_diff, extent=(-19.5, 20.5, -19.5, 20.5), cmap=cmap_diff)
+        clb = plt.colorbar(im_diffd, cax=ax8, use_gridspec=True, label='Δ Fold-change ND', pad=.2)
+        ax8.yaxis.set_label_position('left')
 
-            if show:
+        clb = plt.colorbar(im, cax=ax9, use_gridspec=True, label='Δ Fold-change BP', pad=.2)
+        ax9.yaxis.set_label_position('left')
+        plt.savefig('{}_plot1_{}.png'.format(groupset, tag), bbox_inches='tight')
 
-                plt.show()
+        if show:
 
-            else:
+            plt.show()
 
-                plt.close()
-        return vector_xys_abs, vector_xys_rel
+        else:
+
+            plt.close()
+    return vector_xys_abs, vector_xys_rel
 
 
-    def plot_attraction(
+def plot_si(
 
-        self,
-        df_merged,
+        df,
         groups=[],
         expset_name=''
-    ):
-        dfEpiAn = df_merged[np.any([(df_merged['group'] == group) for group in groups], axis=0)]
-        dfEpiAn = dfEpiAn.groupby(['episode', 'animalIndex', 'line', 'group', 'anSize'], sort=True).mean().reset_index()
-        dfEpiAn = dfEpiAn.sort_values('group')
 
-        fig, ax = plt.subplots(dpi=300)
-        # sns.stripplot(data=dfEpiAn,x='episode',y='si',zorder=-1,hue='group',dodge=10, jitter=True, ax=ax, alpha=.5)
-        sns.swarmplot(data=dfEpiAn, x='episode', y='si', zorder=-1, hue='group', dodge=10, ax=ax, alpha=.5)
+):
+    print(groups)
+    if groups == []:
+        groups = df['group'].unique()
 
-        sns.pointplot(data=dfEpiAn, ci='sd', x='episode', hue='group', y='si', estimator=np.median, ax=ax, dodge=.5,
-                      jitter=False, linestyles=['none'] * 5, lw=1)
+    df_epi_an = df.groupby(['episode', 'animalIndex', 'line', 'group', 'anSize'], sort=True).mean().reset_index()
+    df_epi_an = df_epi_an[np.any([(df_epi_an['group'] == group) for group in groups], axis=0)]
+    df_epi_an = df_epi_an.sort_values('group')
 
-        ax.set_xticklabels(['continuous', 'bout-like'])
-        ax.set_ylabel('Virtual attraction')
-        handles, labels = ax.get_legend_handles_labels()
-        labels_legend = []
-        for group in dfEpiAn['group'].unique():
-            labels_legend.append(
-                '{}, n={}'.format(group, dfEpiAn[dfEpiAn['group'] == group]['animalIndex'].unique().shape[0]))
+    fig, ax = plt.subplots(dpi=300)
+    # sns.stripplot(data=df_epi_an,x='episode',y='si',zorder=-1,hue='group',dodge=10, jitter=True, ax=ax, alpha=.5)
+    sns.swarmplot(data=df_epi_an, x='episode', y='si', zorder=-1, hue='group', dodge=10, ax=ax, alpha=.5)
 
-        l = plt.legend(handles[0:5], labels_legend, loc='upper left', borderaxespad=0.)
-        plt.savefig('attraction_animalsbygroup_{}.png'.format(expset_name), bbox_inches='tight')
-        plt.show()
+    sns.pointplot(data=df_epi_an, ci='sd', x='episode', hue='group', y='si', estimator=np.median, ax=ax, dodge=.5,
+                  jitter=False, linestyles=['none'] * len(groups), lw=1)
 
+    ax.set_xticklabels(['continuous', 'bout-like'])
+    ax.set_ylabel('Virtual attraction')
+    handles, labels = ax.get_legend_handles_labels()
+    labels_legend = []
+    for group in sorted(groups):
+        labels_legend.append(
+            '{}, n={}'.format(group, df_epi_an[df_epi_an['group'] == group]['animalIndex'].unique().shape[0]))
 
-
-
+    l = plt.legend(handles[0:len(groups)], labels_legend, loc='upper left', borderaxespad=0.)
+    plt.savefig('attraction_animalsbygroup_{}.png'.format(expset_name), bbox_inches='tight')
+    plt.show()
 
 if __name__ == "__main__":
 
     ops = {
 
-        'base': 'J:/_Projects/J-sq',
+        'base': 'C:/Users/jkappel/J-sq',
         'expset_name': 'jjAblationsBilateral',
         'stim_protocol': 'boutVsSmooth_grateloom',
         'tag': '',
@@ -1423,16 +1428,17 @@ if __name__ == "__main__":
         'filteredMaps': True
 
     }
-    abl_b = VectorFieldAnalysis(**ops)
-    abl_b.process_dataset()
+
+    # abl_b = VectorFieldAnalysis(**ops)
+    # abl_b.process_dataset()
 
     ops['expset_name'] = 'jjAblations'
-
+    ops['stim_protocol'] = 'boutVsSmooth'
     abl_b = VectorFieldAnalysis(**ops)
     abl_b.process_dataset()
 
     ops['expset_name'] = 'jjAblationsGratingLoom'
-
+    ops['stim_protocol'] = 'boutVsSmooth_grateloom'
     abl_b = VectorFieldAnalysis(**ops)
     abl_b.process_dataset()
 
