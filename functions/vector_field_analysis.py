@@ -326,98 +326,6 @@ def plot_vector_field(
               )
     return u, v, diffx, diffy, hist_pos
 
-def merge_datasets(
-
-        root='C:/Users/jkappel/PyCharmProjects/jlsocialbehavior/jlsocialbehavior',
-        expset_merge=None
-):
-
-    """
-    Merge datasets into one bout df and one vector array
-
-    :param root: str, data directory
-    :param expset_merge: list of lists, -> names of datasets to merge, see below
-    :return:
-    """
-
-    if not expset_merge:
-
-        expsets_merge = [['jjAblations_smooth_rot', 'jjAblationsGratingLoom_smooth_rot'],
-                         ['jjAblations_shifted_smooth_rot', 'jjAblationsGratingLoom_shifted_smooth_rot'],
-                         ['jjAblations_smooth_rot_swap_stim', 'jjAblationsGratingLoom_smooth_rot_swap_stim']]
-
-    for mergeset in expset_merge:
-
-        vectors_merged = []
-        bout_df_merged = []
-        hd_merged = []
-
-        # manually excluded animals, animalIndex from jlsocial df is 1-based, my Animal index as well
-        # exdict = {
-        #
-        #     0: np.array([8, 9, 10, 14, 17, 25, 27, 33, 38, 45, 47, 52, 58, 66, 69, 73]),
-        #
-        #     1: np.array([6, 13, 24, 34, 37, 38, 39, 45, 48, 50, 56, 57, 58, 62, 63, 64, 76, 84])
-        # }
-
-        # exdict = {
-        #
-        #     0: np.array([4, 8, 9, 10, 13, 14, 17, 18, 19, 20, 21, 25, 27, 34, 35, 36, 38, 39, 41, 45, 47, 58, 62, 66, 69, 73]),
-        #
-        #     1: np.array([6, 24, 28, 34, 37, 38, 39, 40, 41, 42, 43])
-        # }
-
-        exdict = {
-
-            0: np.array([]),
-
-            1: np.array([])
-
-        }
-        for exno, expset_name in enumerate(mergeset):
-
-            exclude_animals = exdict[exno]
-            print('Exclude animals: ', exclude_animals)
-            all_bout_xys = pickle.load(open(os.path.join(root, 'all_bout_xys_{}.p'.format(expset_name)), 'rb'))
-            bout_df = pickle.load(open(os.path.join(root, 'bout_df_{}.p'.format(expset_name)), 'rb'))
-
-            anfilt = np.invert([i in exclude_animals for i in bout_df['Animal index'].values])
-            df_filt = bout_df[anfilt]
-
-            stim_xys = np.array([j for i in all_bout_xys for j in i[1]])[anfilt]
-            stim_hd = np.array([j for i in all_bout_xys for j in i[3]])[anfilt]
-            fish_hd = np.array([j for i in all_bout_xys for j in i[4]])[anfilt]
-
-            stim_vectors = np.concatenate([stim_xys[:, 0], stim_xys[:, 1] - stim_xys[:, 0]], axis=1)
-            nanfilt = np.invert([any(i) for i in np.isnan(stim_vectors)])
-            vectors_filt = stim_vectors[nanfilt]
-
-            startdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(stim_hd[:, 0], fish_hd[:, 0])]
-            stopdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(stim_hd[:, 1], fish_hd[:, 1])]
-            diffdiff = [calc_anglediff(i, j, theta=np.pi) for i, j in zip(stopdiff, startdiff)]
-            hd_diffs = np.array([startdiff, stopdiff, diffdiff]).T
-
-            hd_diffs = hd_diffs[nanfilt]
-            df_filt = df_filt[nanfilt]
-
-            dset = pd.Series([exno + 1] * df_filt.shape[0], index=df_filt.index)
-            df_filt['Dataset'] = dset
-
-            print(vectors_filt.shape)
-            vectors_merged.append(vectors_filt)
-            bout_df_merged.append(df_filt)
-            hd_merged.append(hd_diffs)
-
-        bout_vectors = np.concatenate(vectors_merged, axis=0)
-        bout_df_merged = pd.concat(bout_df_merged, sort=False)
-        hd_merged = np.concatenate(hd_merged, axis=0)
-
-        pickle.dump(bout_vectors, open(os.path.join(root, 'bout_vectors_{}.p'.format(''.join(mergeset))), 'wb'))
-        pickle.dump(hd_merged, open(os.path.join(root, 'hd_diff_{}.p'.format(''.join(mergeset))), 'wb'))
-        pickle.dump(bout_df_merged, open(os.path.join(root, 'bout_df_{}.p'.format(''.join(mergeset))), 'wb'))
-
-        return bout_vectors, hd_merged, bout_df_merged
-
 
 class VectorFieldAnalysis:
 
@@ -451,10 +359,9 @@ class VectorFieldAnalysis:
         self.vmap_res = kwargs.get('vmap_res', (30, 30, 30, 30))
         self.revtag = kwargs.get('revtag', 'L')
         self.abs_dist = kwargs.get('abs_dist', True)
-        self.exclude_animals = kwargs.get('exculde_animals', [])
-        # self. = kwargs.get('', )
-        # self. = kwargs.get('', )
-        # self. = kwargs.get('', )
+        self.exclude_anids = kwargs.get('exculde_animals', [])
+        self.calc_thigmo_thresh = kwargs.get('calc_thigmo_thresh', True)
+        self.thigmothresh = kwargs.get('thigmothresh', 35.)
         # self. = kwargs.get('', )
 
         # experiment set parameters
@@ -506,6 +413,10 @@ class VectorFieldAnalysis:
     def process_dataset(self):
 
         self.read_experiment_set()
+        if self.calc_thigmo_thresh:
+
+            self.exclude_anids = get_thigmo_thresh(self.df, thresh=self.thigmothresh)
+
         if self.default_limit is not None:
             self.limit = self.default_limit
 
@@ -534,6 +445,11 @@ class VectorFieldAnalysis:
         )
 
         return
+
+    def process_nmaps(self):
+
+        self.read_experiment_set()
+        self.extract_nmaps()
 
     def read_experiment_set(self):
 
@@ -677,8 +593,7 @@ class VectorFieldAnalysis:
         )
 
         self.calc_bout_vectors(all_bout_xys, tag=tag)
-        self.extract_nmaps()
-        self.generate_mapdict(tag=tag)
+        self.extract_nmaps(tag=tag)
         self.collect_vector_hists(tag=tag)
 
         return
@@ -857,7 +772,7 @@ class VectorFieldAnalysis:
         self.bout_df = pd.DataFrame({
 
             'Episode': bout_episodes,
-            'Animal index': bout_animal_idxs + 1,
+            'Animal index': bout_animal_idxs + 1,  # Adding +1 for 1-indexing
             'Bout distance': self.dist,
             'Group': bout_groups,
             'Bout index': bout_idxs
@@ -877,48 +792,39 @@ class VectorFieldAnalysis:
         """
 
         n_animals = sum(self.n_animals_sess)
-        # Filtered
-        self.neighbormaps_bl = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
-        self.neighbormaps_cont = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
+        neighbormaps = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
 
-        for nmap, stimtype in zip([self.neighbormaps_bl, self.neighbormaps_cont], self.unique_episodes):
+        for sidx, shift in zip([0, 1], [False, True]):
+            for stimtype in self.unique_episodes:
 
-            for mapno in range(len(self.map_paths)):
+                nmap = neighbormaps.copy()
+                for mapno in range(len(self.map_paths)):
 
-                print(self.map_paths[mapno])
-                tmp = np.load(self.map_paths[mapno])
-                print(tmp.shape, mapno)
-                tmpDf = self.df[self.df.animalSet == mapno]
-                for a in range(self.n_animals_sess[mapno]):
-                    an = sum(self.n_animals_sess[:mapno]) + a
-                    print(an)
-                    dfIdx = (tmpDf.episode == stimtype) & \
-                            (tmpDf.animalID == a) & \
-                            (tmpDf.inDishTime < self.limit)
-                    ix = np.where(dfIdx)[0]
-                    nmap[an, :, :] = np.nanmean(tmp[ix, 0, 0, :, :], axis=0)
+                    print(self.map_paths[mapno])
+                    tmp = np.load(self.map_paths[mapno])
+                    print(tmp.shape, mapno)
+                    tmpDf = self.df[self.df.animalSet == mapno]
+                    for a in range(self.n_animals_sess[mapno]):
+                        an = sum(self.n_animals_sess[:mapno]) + a
+                        print(an)
+                        dfIdx = (tmpDf.episode == stimtype) & \
+                                (tmpDf.animalID == a) & \
+                                (tmpDf.inDishTime < self.limit)
+                        ix = np.where(dfIdx)[0]
+                        nmap[an, :, :] = np.nanmean(tmp[ix, 0, sidx, :, :], axis=0)
 
-        # Shifted filtered
-        self.sh_neighbormaps_bl = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
-        self.sh_neighbormaps_cont = np.zeros((n_animals, self.nmap_res[0], self.nmap_res[1])) * np.nan
+                if '07' in stimtype:
+                    if shift:
+                        self.sh_neighbormaps_cont = nmap
+                    else:
+                        self.neighbormaps_cont = nmap
+                else:
+                    if shift:
+                        self.sh_neighbormaps_bl = nmap
+                    else:
+                        self.neighbormaps_bl = nmap
 
-        for nmap, stimtype in zip([self.sh_neighbormaps_bl, self.sh_neighbormaps_cont], self.unique_episodes):
-
-            for mapno in range(len(self.map_paths)):
-
-                print(self.map_paths[mapno])
-                tmp = np.load(self.map_paths[mapno])
-                print(tmp.shape)
-                tmpDf = self.df[self.df.animalSet == mapno]
-                for a in range(self.n_animals_sess[mapno]):
-                    an = sum(self.n_animals_sess[:mapno]) + a
-
-                    dfIdx = (tmpDf.episode == stimtype) & \
-                            (tmpDf.animalID == a) & \
-                            (tmpDf.inDishTime < self.limit)
-                    ix = np.where(dfIdx)[0]
-
-                    nmap[an, :, :] = np.nanmean(tmp[ix, 0, 1, :, :], axis=0)
+        self.generate_mapdict()
         return
 
     def generate_mapdict(self, tag=''):
@@ -932,7 +838,7 @@ class VectorFieldAnalysis:
 
         if self.groupsets == []:
 
-            groups = sorted(self.bout_df.Group.unique())
+            groups = sorted(self.df.group.unique())
             self.groupsets = [[group] for group in groups]
 
         for groupset in self.groupsets:
@@ -955,22 +861,25 @@ class VectorFieldAnalysis:
 
                 anids = sorted(self.df.loc[self.df.group == group].animalIndex.unique())
                 print(group, len(list(anids)))
+                if group == 'ctr':
+
+                    group = 'wt'
 
                 grkey_bl, grkey_cont = '_'.join([group, '10k20f']), '_'.join([group, '07k01f'])
-                for an in anids:
+                for anid in anids:
 
-                    if an in self.exclude_animals:
+                    if anid in self.exclude_anids:
 
                         nex += 1
                         nan += 1
-                        print('# animals ex', nex)
+                        print('Animal excluded', anid)
 
                         continue
 
                     nan += 1
                     print('# animals', nan)
-                    nmap_bl = self.neighbormaps_bl[an - 1]
-                    nmap_cont = self.neighbormaps_cont[an - 1]
+                    nmap_bl = self.neighbormaps_bl[anid - 1]
+                    nmap_cont = self.neighbormaps_cont[anid - 1]
 
                     # yflip because of UP/DOWN confusion in the raw data acquisition
                     # TODO: implement yflip in the nmap calculation
@@ -1026,6 +935,11 @@ class VectorFieldAnalysis:
 
                 print('Group: ', group)
                 for anid in anids:
+
+                    if anid in self.exclude_anids:
+
+                        print('Animal excluded', anid)
+                        continue
 
                     print('Animal index: ', anid)
                     for episode in episodes:
@@ -1153,7 +1067,10 @@ def plot_vfs_ind(
         alpha=.7,
         maxp=False,
         show=False,
-        ctr='CtrE'
+        plotdiff=False,
+        show_nmaps_single=True,
+        ctr='wt',
+        exan_dict={},
 
 ):
     vector_xys_abs = {}
@@ -1165,17 +1082,19 @@ def plot_vfs_ind(
     be_rel = [np.linspace(b[0], b[1], res_rel[bno] + 1) for bno, b in enumerate([
         edges_pos, edges_pos, edges_dir, edges_dir])]
 
-    groupsets = sorted(histograms_abs.keys())
+    groupsets = sorted(histograms_abs[sortlogic].keys())
 
     for gno, groupset in enumerate(groupsets):
 
-        fig = plt.figure(figsize=(12, 4), dpi=200)
-        gs = gridspec.GridSpec(nrows=1, ncols=5, width_ratios=[1, 1, 1, .1, .1], height_ratios=[1])
-        gs.update(wspace=0.8, hspace=0.4)
+        if 'dead' in groupset:
 
-        print(groupset, len(histograms_abs[groupset]))
-        hist_abs = np.mean([histogram / np.sum(histogram) for histogram in histograms_abs[groupset]], axis=0)
-        n = len(histograms_abs[groupset])
+            continue
+
+        hists = [histogram / np.sum(histogram) for histogram in histograms_abs[sortlogic][groupset]]
+        hists_thresh = [h for hno, h in enumerate(hists) if hno not in exan_dict[groupset.split('_')[0]]]
+        print(groupset, len(hists_thresh))
+        hist_abs = np.mean(hists_thresh, axis=0)
+        n = len(histograms_abs[sortlogic][groupset])
         print(hist_abs.shape, hist_abs.min(), hist_abs.max())
         print(np.where(np.isnan(hist_abs))[0].shape)
         if '07' in groupset:
@@ -1186,6 +1105,9 @@ def plot_vfs_ind(
 
             label = '_'.join(groupset.split('_')[:-1]) + ' bout-like' + ', n=' + str(n)
 
+        fig = plt.figure(figsize=(12, 4), dpi=200)
+        gs = gridspec.GridSpec(nrows=1, ncols=5, width_ratios=[1, 1, 1, .1, .1], height_ratios=[1])
+        gs.update(wspace=0.8, hspace=0.4)
         episode = groupset.split('_')[-1]
         ax0 = plt.subplot(gs[0, 2])
         angles_abs, dists_abs, diffx, diffy, hist_pos = plot_vector_field(
@@ -1206,7 +1128,10 @@ def plot_vfs_ind(
             alpha=alpha
         )
 
-        nmap = np.nanmean(mapdict[sortlogic][groupset], axis=0)
+        nmaps = mapdict[sortlogic][groupset]
+        nmaps_thresh = [n for nno, n in enumerate(nmaps) if nno not in exan_dict[groupset.split('_')[0]]]
+        print(groupset, len(nmaps_thresh))
+        nmap = np.nanmean(nmaps_thresh, axis=0)
         vector_xys_abs[groupset] = (diffx, diffy, angles_abs, dists_abs, hist_pos, nmap)
         ax1 = plt.subplot(gs[0, 0])
         nmap_im = ax1.imshow(nmap.T, origin='lower', cmap=cmap_nmap, clim=clim_nmap, extent=(-19.5, 20.5, -19.5, 20.5))
@@ -1244,122 +1169,196 @@ def plot_vfs_ind(
 
             plt.close()
 
-    scales = [scale_abs, scale_rel]
-    for gno, groupset in enumerate(groupsets):
+        # if show_nmaps_single:
+        #      if not ctr in groupset:
+        #         for nno, nmap_ind in enumerate(nmaps_thresh):
+        #
+        #             print(nno)
+        #             fig, ax = plt.subplots(figsize=(3,3))
+        #             ax.imshow(nmap_ind.T, origin='lower', cmap=cmap_nmap, clim=clim_nmap,
+        #                       extent=(-19.5, 20.5, -19.5, 20.5))
+        #             plt.show()
 
-        dset = re.findall('_\d+_', groupset)
-        print(groupset, dset)
-        if len(dset) == 0:
+    if plotdiff:
 
-            dset = ''
+        scales = [scale_abs, scale_rel]
+        for gno, groupset in enumerate(groupsets):
 
-        else:
+            if 'dead' in groupset:
 
-            dset = dset[0][:-1]
+                continue
 
-        wt_bl = '{}{}_10k20f'.format(ctr, dset)
-        wt_cont = '{}{}_07k01f'.format(ctr, dset)
-        print(wt_bl, wt_cont)
-        diffx_abs, diffy_abs, angles_abs, dists_abs, hist_abs, nmap = vector_xys_abs[groupset]
-        # dists_rel = np.sqrt(vector_xys_rel[groupset][0] ** 2 + vector_xys_rel[groupset][1] ** 2)
+            dset = re.findall('_\d+_', groupset)
+            print(groupset, dset)
+            if len(dset) == 0:
 
-        if groupset == wt_bl or '07k01f' in groupset and not ctr in groupset:
+                dset = ''
 
-            diffx_cont, diffy_cont, angles_cont, _, hist_cont, nmap_cont = vector_xys_abs[wt_cont]
-            # dists_cont = np.sqrt(vector_xys_rel[wt_cont][0] ** 2 + vector_xys_rel[wt_cont][1] ** 2)
+            else:
 
-            diffangles = np.array([calc_anglediff(i, j, theta=np.pi) for i, j in zip(angles_abs, angles_cont)])
-            print(angles_abs.shape, angles_cont.shape, diffangles.shape)
-            print(len(diffangles), diffangles[0].shape)
-            # diffdists = dists_rel - dists_cont
-            hist_pos = hist_abs - hist_cont
-            diffdensity = nmap - nmap_cont
-        else:
+                dset = dset[0][:-1]
 
-            diffx_bl, diffy_bl, angles_bl, _, hist_bl, nmap_bl = vector_xys_abs[wt_bl]
-            # dists_bl = np.sqrt(vector_xys_rel[wt_bl][0] ** 2 + vector_xys_rel[wt_bl][1] ** 2)
+            wt_bl = '{}{}_10k20f'.format(ctr, dset)
+            wt_cont = '{}{}_07k01f'.format(ctr, dset)
+            print(wt_bl, wt_cont)
+            diffx_abs, diffy_abs, angles_abs, dists_abs, hist_abs, nmap = vector_xys_abs[groupset]
+            # dists_rel = np.sqrt(vector_xys_rel[groupset][0] ** 2 + vector_xys_rel[groupset][1] ** 2)
 
-            diffangles = np.array(
-                [calc_anglediff(i, j, theta=np.pi) for i, j in zip(angles_abs, angles_bl)])
-            # diffdists = dists_rel - dists_bl
-            hist_pos = hist_abs - hist_bl
-            diffdensity = nmap - nmap_bl
+            if groupset == wt_bl or '07k01f' in groupset and not ctr in groupset:
 
-        fig = plt.figure(figsize=(12, 4), dpi=200)
-        gs = gridspec.GridSpec(nrows=1, ncols=5, width_ratios=[1, 1, 1, .1, .1], height_ratios=[1])
-        gs.update(wspace=0.8, hspace=0.4)
+                diffx_cont, diffy_cont, angles_cont, _, hist_cont, nmap_cont = vector_xys_abs[wt_cont]
+                # dists_cont = np.sqrt(vector_xys_rel[wt_cont][0] ** 2 + vector_xys_rel[wt_cont][1] ** 2)
 
-        ax5 = plt.subplot(gs[0, 0])
-        bin_values = [bins[:-1] + (bins[1] - bins[0]) for bins in be_abs[:2]]
-        #         x1, x2 = np.meshgrid(bin_values[0], bin_values[1])
-        #         ax5.quiver(x1, x2, x1/x1, x2/x2,
-        #                    diffangles,
-        #                    #clim=clim_diff,
-        #                    cmap='coolwarm',
-        #                    units='xy',
-        #                    angles=np.rad2deg(diffangles)-90,
-        #                    scale_units=None,
-        #                    scale=1,
-        #                    width=width,
-        #                    alpha=alpha
-        #                  )
-        ax5.imshow(diffangles.reshape(30, 30), origin='lower', cmap='coolwarm')
-        ax5.set_aspect('equal')
+                diffangles = np.array([calc_anglediff(i, j, theta=np.pi) for i, j in zip(angles_abs, angles_cont)])
+                print(angles_abs.shape, angles_cont.shape, diffangles.shape)
+                print(len(diffangles), diffangles[0].shape)
+                # diffdists = dists_rel - dists_cont
+                hist_pos = hist_abs - hist_cont
+                diffdensity = nmap - nmap_cont
+            else:
 
-        if gno == 0:
-            ax5.set_title('Δ Angles')
-        ax6 = plt.subplot(gs[0, 1])
-        im_diffd = ax6.imshow(
-            diffdensity.T,
-            origin='lower',
-            cmap='coolwarm',
-            clim=clim_diff,
-            extent=(-29.5, 30.5, -29.5, 30.5)
+                diffx_bl, diffy_bl, angles_bl, _, hist_bl, nmap_bl = vector_xys_abs[wt_bl]
+                # dists_bl = np.sqrt(vector_xys_rel[wt_bl][0] ** 2 + vector_xys_rel[wt_bl][1] ** 2)
 
-        )
-        ax6.set_xlim(-19.5, 20.5)
-        ax6.set_ylim(-19.5, 20.5)
+                diffangles = np.array(
+                    [calc_anglediff(i, j, theta=np.pi) for i, j in zip(angles_abs, angles_bl)])
+                # diffdists = dists_rel - dists_bl
+                hist_pos = hist_abs - hist_bl
+                diffdensity = nmap - nmap_bl
 
-        ax6.set_title('Δ Neighbor density')
+            fig = plt.figure(figsize=(12, 4), dpi=200)
+            gs = gridspec.GridSpec(nrows=1, ncols=5, width_ratios=[1, 1, 1, .1, .1], height_ratios=[1])
+            gs.update(wspace=0.8, hspace=0.4)
 
-        ax7 = plt.subplot(gs[0, 2])
-        ax8 = plt.subplot(gs[0, 3])
-        ax9 = plt.subplot(gs[0, 4])
+            ax5 = plt.subplot(gs[0, 0])
+            bin_values = [bins[:-1] + (bins[1] - bins[0]) for bins in be_abs[:2]]
+            #         x1, x2 = np.meshgrid(bin_values[0], bin_values[1])
+            #         ax5.quiver(x1, x2, x1/x1, x2/x2,
+            #                    diffangles,
+            #                    #clim=clim_diff,
+            #                    cmap='coolwarm',
+            #                    units='xy',
+            #                    angles=np.rad2deg(diffangles)-90,
+            #                    scale_units=None,
+            #                    scale=1,
+            #                    width=width,
+            #                    alpha=alpha
+            #                  )
+            ax5.imshow(diffangles.reshape(30, 30), origin='lower', cmap='coolwarm')
+            ax5.set_aspect('equal')
 
-        ax7.set_title('Δ Bout probability')
+            if gno == 0:
+                ax5.set_title('Δ Angles')
+            ax6 = plt.subplot(gs[0, 1])
+            im_diffd = ax6.imshow(
+                diffdensity.T,
+                origin='lower',
+                cmap='coolwarm',
+                clim=clim_diff,
+                extent=(-29.5, 30.5, -29.5, 30.5)
 
-        im = ax7.imshow(hist_pos.T, origin='lower', clim=clim_diff, extent=(-19.5, 20.5, -19.5, 20.5), cmap=cmap_diff)
-        clb = plt.colorbar(im_diffd, cax=ax8, use_gridspec=True, label='Δ Fold-change ND', pad=.2)
-        ax8.yaxis.set_label_position('left')
+            )
+            ax6.set_xlim(-19.5, 20.5)
+            ax6.set_ylim(-19.5, 20.5)
 
-        clb = plt.colorbar(im, cax=ax9, use_gridspec=True, label='Δ Fold-change BP', pad=.2)
-        ax9.yaxis.set_label_position('left')
-        plt.savefig('{}_plot1_{}.png'.format(groupset, tag), bbox_inches='tight')
+            ax6.set_title('Δ Neighbor density')
 
-        if show:
+            ax7 = plt.subplot(gs[0, 2])
+            ax8 = plt.subplot(gs[0, 3])
+            ax9 = plt.subplot(gs[0, 4])
 
-            plt.show()
+            ax7.set_title('Δ Bout probability')
 
-        else:
+            im = ax7.imshow(hist_pos.T, origin='lower', clim=clim_diff, extent=(-19.5, 20.5, -19.5, 20.5), cmap=cmap_diff)
+            clb = plt.colorbar(im_diffd, cax=ax8, use_gridspec=True, label='Δ Fold-change ND', pad=.2)
+            ax8.yaxis.set_label_position('left')
 
-            plt.close()
+            clb = plt.colorbar(im, cax=ax9, use_gridspec=True, label='Δ Fold-change BP', pad=.2)
+            ax9.yaxis.set_label_position('left')
+            plt.savefig('{}_plot1_{}.png'.format(groupset, tag), bbox_inches='tight')
+
+            if show:
+
+                plt.show()
+
+            else:
+
+                plt.close()
     return vector_xys_abs, vector_xys_rel
+
+
+def get_thigmo_thresh(
+
+        df,
+        thresh=35.,
+        std_f=1.,
+        groupwise=False
+
+):
+    '''
+    Calculating which animals have a thigmotaxis index > thresh
+    '''
+
+    n_animals = df.animalIndex.unique().shape[0]
+
+    thigmos = [np.nanmean(df[df['animalIndex'] == i]['thigmoIndex'].values) for i in range(1, n_animals + 1)]
+    fig, ax = plt.subplots(figsize=(5, 3), dpi=300)
+    _ = plt.hist(thigmos, bins=150)
+    if not thresh:
+        thresh = np.mean(thigmos) + np.std(thigmos) * std_f
+
+    plt.axvline(thresh, color='red')
+    plt.axvline(np.nanmean(thigmos), linestyle=':', color='red')
+
+    plt.savefig('thighmohist.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+    exan = [i for i in range(1, n_animals + 1) if not
+                np.nanmean(df[df['animalIndex'] == i]['thigmoIndex'].values) < thresh]
+    if groupwise:
+
+        exan_dict = {}
+        print(df['group'].unique())
+        for group in df['group'].unique():
+            gdf = df[df.group == group]
+            anids = gdf.animalIndex.unique()
+            exan_gwise = [ino for ino, i in enumerate(anids) if not
+                        np.nanmean(gdf[gdf['animalIndex'] == i]['thigmoIndex'].values) < thresh]
+
+            exan_dict[group] = exan_gwise
+        return exan, exan_dict
+
+    else:
+
+        return exan, None
 
 
 def plot_si(
 
         df,
         groups=[],
-        expset_name=''
+        expset_name='',
+        exan=[],
+        exclude_groups=[]
 
 ):
-    print(groups)
+
+    exbool = np.invert(
+        np.any(np.concatenate([[exan[i] == df.animalIndex.values] for i in range(len(exan))], axis=0).T, axis=1))
+    df = df[exbool]
+    for exgroup in exclude_groups:
+
+        df = df[np.invert(df.group == exgroup)]
+
     if groups == []:
+
         groups = df['group'].unique()
+
+    print(groups)
 
     df_epi_an = df.groupby(['episode', 'animalIndex', 'line', 'group', 'anSize'], sort=True).mean().reset_index()
     df_epi_an = df_epi_an[np.any([(df_epi_an['group'] == group) for group in groups], axis=0)]
-    df_epi_an = df_epi_an.sort_values('group')
+    df_epi_an = df_epi_an.sort_values(by=['group', 'episode'])
 
     fig, ax = plt.subplots(dpi=300)
     # sns.stripplot(data=df_epi_an,x='episode',y='si',zorder=-1,hue='group',dodge=10, jitter=True, ax=ax, alpha=.5)
@@ -1384,7 +1383,7 @@ if __name__ == "__main__":
 
     ops = {
 
-        'base': 'C:/Users/jkappel/J-sq',
+        'base': 'J:/_Projects/J-sq',
         'expset_name': 'jjAblationsBilateral',
         'stim_protocol': 'boutVsSmooth_grateloom',
         'tag': '',
@@ -1392,7 +1391,7 @@ if __name__ == "__main__":
         'shift': False,
         'yflip': True,
         'default_limit': None, # CARFUL HERE, No False!!!
-        'load_expset': False,
+        'load_expset': True,
         'cam_height': [105, 180],
         'fps': 30,
 
@@ -1402,6 +1401,7 @@ if __name__ == "__main__":
         'unique_episodes': ['07k01f', '10k20f'],
         'groupsets': [],
         'sortlogics': ['groupwise'],
+        'ctr': 'ctr',
 
         'nmap_res': (30, 30),
         'dist_filter': (0, 30),
@@ -1412,6 +1412,8 @@ if __name__ == "__main__":
         'vmap_res': (30, 30, 30, 30),
         'revtag': 'L',
         'abs_dist': True,
+         'calc_thigmo_thresh': True,
+         'thigmothresh': 35.,
 
         # experiment set parameters
         'epiDur': 5,
@@ -1421,7 +1423,7 @@ if __name__ == "__main__":
         'minShift': 60,
         'episodePLcode': 0,
         'recomputeAnimalSize': 0,
-        'SaveNeighborhoodMaps': 1,
+        'SaveNeighborhoodMaps': 0,
         'computeLeadership': 0,
         'computeBouts': 0,
         'nShiftRuns': 3,
@@ -1429,133 +1431,17 @@ if __name__ == "__main__":
 
     }
 
-    # abl_b = VectorFieldAnalysis(**ops)
-    # abl_b.process_dataset()
-
+    abl_b = VectorFieldAnalysis(**ops)
+    #abl_b.process_dataset()
+    abl_b.process_nmaps()
     ops['expset_name'] = 'jjAblations'
     ops['stim_protocol'] = 'boutVsSmooth'
     abl_b = VectorFieldAnalysis(**ops)
-    abl_b.process_dataset()
-
+    #abl_b.process_dataset()
+    abl_b.process_nmaps()
     ops['expset_name'] = 'jjAblationsGratingLoom'
     ops['stim_protocol'] = 'boutVsSmooth_grateloom'
     abl_b = VectorFieldAnalysis(**ops)
-    abl_b.process_dataset()
-
-
-
-
-
-
-
-
-
-
-    # for_jl = False
-    # # boolean for real data, y-axis flippled
-    # yflip = True
-    # load_data = False
-    # root = 'C:/Users/jkappel/PyCharmProjects/jlsocialbehavior/jlsocialbehavior'
-    # if for_jl:
-    #
-    #     # If you fill in the exp_set and the respective dataframe here as well as the n_animals_sess and frames_ep,
-    #     # it might just run through with some tweaking, at least until the generation of the histograms. Further explanation
-    #     # for the variables can be found in generate_bout_vectors
-    #
-    #     exp_set = ...
-    #     n_animals_sess = [15, 15, 15]
-    #     df = ...
-    #     frames_ep = 9000
-    #
-    #     all_bout_xys, bout_df = generate_bout_vectors(
-    #
-    #         exp_set,
-    #         n_animals_sess,
-    #         df,
-    #         frames_ep
-    #
-    #     )
-    #
-    #     bout_vectors, hd_merged, df_merged = merge_datasets(
-    #
-    #         root=root,
-    #         expset_merge=[['Data1', 'Data2']]
-    #     )
-    #
-    # elif load_data:
-    #
-    #     mergeset = ['jjAblations_shifted_smooth_rot', 'jjAblationsGratingLoom_shifted_smooth_rot']
-    #     bout_vectors = pickle.load(open(os.path.join(root, 'bout_vectors_{}.p'.format(''.join(mergeset))), 'rb'))
-    #     bout_df = pickle.load(open(os.path.join(root, 'bout_df_{}.p'.format(''.join(mergeset))), 'rb'))
-    #     hd_merged = pickle.load(open(os.path.join(root, 'hd_diff_{}.p'.format(''.join(mergeset))), 'rb'))
-    #
-    # else:
-    #
-    #     # base = analyse_datasets(
-    #     #
-    #     #     expset_names=('jjAblations', 'jjAblationsGratingLoom'),
-    #     #     stim_protocols=('boutVsSmooth', 'boutVsSmooth_grateloom'),
-    #     #     default_limit=300*30*60,
-    #     #     load_expset=True
-    #     #
-    #     # )
-    #     #mergeset = ['jjAblations_smooth_rot', 'jjAblationsGratingLoom_smooth_rot']
-    #
-    #
-    #     base = r'J:/_Projects/J-sq'
-    #     base = process_datasets(
-    #         expset_names=['jjAblationsBilateral'],
-    #         stim_protocols=['boutVsSmooth_grateloom'],
-    #         tag='',
-    #         shift=False,
-    #         swap_stim=False
-    #     )
-    #     mergeset = ['jjAblationsBilateral']
-    #     bout_vectors, hd_merged, bout_df = merge_datasets(
-    #
-    #         expset_merge=[mergeset],
-    #         root=base
-    #     )
-    #
-    # # switching sign of the first dimension due to flipping of y axis in the data preprocessing
-    # if yflip:
-    #
-    #     bout_vectors[:, 0] *= -1
-    #     bout_vectors[:, 2] *= -1
-    #
-    #
-    # sortlogics = ['groupwise', 'dsetwise-group']
-    # groupsets = [
-    #
-    #     ['CtrE'],
-    #     ['AblB'],
-    #     ['Bv']
-    #
-    # ]
-    # for dist_type, res, angles in zip(dist_types, [(30, 30, 90, 90, 90)], [True]):
-    #     print(hd_merged.shape)
-    #     hists, _ = collect_stats(
-    #         bout_df,
-    #         bout_vectors,
-    #         groupsets=groupsets,
-    #         sortlogics=sortlogics,
-    #         statistic=None,
-    #         statvals=None,
-    #         hd_hist=False,
-    #         rel_stim_hd=hd_merged[:, 0],
-    #         angles=angles,
-    #         dist_type=dist_type,
-    #         dist_filter=(0, 30),
-    #         edges_pos=(-20, 20),
-    #         edges_dir=(-12, 12),
-    #         edges_angles=(-np.pi, np.pi),
-    #         edges_dists=(0, 30),
-    #         res=res
-    #     )
-    #
-    #     pickle.dump(hists, open(os.path.join(base, 'histograms_{}_{}_{}_dict.p'.format(
-    #         ''.join(mergeset),
-    #         ('_').join(sortlogics),
-    #         dist_type)), 'wb'))
-
+    #abl_b.process_dataset()
+    abl_b.process_nmaps()
 
