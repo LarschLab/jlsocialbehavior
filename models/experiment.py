@@ -78,6 +78,7 @@ class ExperimentMeta(object):
         self.recomputeAnimalSize = None
         self.ComputeBouts = None
         self.computeLeadership = None
+        self.ComputeSync = None
         self.stimulusProtocol = None
         self.allowEpisodeSwitch = None
 
@@ -291,6 +292,14 @@ class ExperimentMeta(object):
         except KeyError:
             print('computeLeadership not specified. Using default: True')
             self.ComputeBouts = True
+
+        try:
+            self.ComputeSync = expinfo['ComputeSync']
+        except KeyError:
+            print('ComputeSync not specified. Using default: False')
+            self.ComputeSync = False
+
+
 
         try:
             self.allowEpisodeSwitch = expinfo['allowEpisodeSwitch']
@@ -602,6 +611,14 @@ class experiment(object):
         else:
             boutDur = 0
 
+        if self.expInfo.ComputeSync == 1:
+            print('Synchronization ... ', end='')
+            sync = np.array([x.crossCorrStimAn() for x in self.pair])
+            sync_amp=[x[0] for x in sync]
+            sync_t=[x[1] for x in sync]
+        else:
+            sync_amp=0
+            sync_t=0
 
         print(' done.')
 
@@ -638,6 +655,8 @@ class experiment(object):
         df['thigmoIndex'] = thigmoIndex
         df['boutDur'] = boutDur
         df['leadershipIndex'] = leadershipIndex
+        df['sync_amp'] = sync_amp
+        df['sync_t'] = sync_t
 
         txtFn = os.path.split(self.expInfo.trajectoryPath)[1]
         csvFileOut = os.path.join(self.expInfo.processingDir, txtFn[:-4] + '_siSummary_epi' + str(self.expInfo.episodeDur) + '.csv')
