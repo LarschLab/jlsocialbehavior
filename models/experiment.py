@@ -237,8 +237,12 @@ class ExperimentMeta(object):
 
         try:
             self.episodes = expinfo['episodes']
+            maxEpisodes= int(np.floor(((self.numFrames / self.fps) / 60) / self.episodeDur))
+            if maxEpisodes<self.episodes:
+                print('Warning: more episodes specified than what is available. setting to ', maxEpisodes)
+                self.episodes=maxEpisodes
             if self.episodes == -1:
-                self.episodes = int(np.floor(((self.numFrames / self.fps) / 60) / self.episodeDur))
+                self.episodes = maxEpisodes
         except KeyError:
             print('episode number not specified. Using default: all')
             self.episodes = int(np.floor(((self.numFrames / self.fps) / 60) / self.episodeDur))
