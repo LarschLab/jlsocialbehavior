@@ -474,18 +474,6 @@ class experiment(object):
             print('Wrong experiment definition argument. Provide TxtPath or pd.Series')
             raise FileNotFoundError
 
-    def getAnimalData(self,anNr=0,anID=0,field='speed',neighbor=False):
-        epi = np.array([self.episodeAll[self.pair[x].rng[0]+10] for x in np.where(self.pair2animal == anNr)[0]])
-        if field=='speed':
-            tmp= np.array([self.pair[x].animals[anID].ts.speed() for x in np.where(self.pair2animal==anNr)[0]])
-        elif field=='relPos':
-            tmp = np.array([self.pair[x].animals[anID].ts.position_relative_to_neighbor_rot() for x in np.where(self.pair2animal == anNr)[0]])
-        elif field=='dStimSize':
-            tmp= np.array([self.pair[x].animals[anID].ts.dStimSize() for x in np.where(self.pair2animal==anNr)[0]])
-
-        return tmp,epi
-
-
     def linkFullAnimals(self):
         for i in range(self.expInfo.numPairs+1):# adding extra 'animal' which is stimulus!
             Animal(ID=i).joinExperiment(self)
