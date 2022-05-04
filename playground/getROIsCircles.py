@@ -16,8 +16,8 @@ import functions.video_functions as vf
 
 import matplotlib.pyplot as plt
 
-base="E:\\b\\medaka\\20190619_testPairs20dpfb\\"
-video = 'out_id0_30fps_20190619125610'
+base="E:\\b\\inbalOMR\\out_id0_30fps_20220316160019\\"
+video = 'out_id0_30fps_20220316160019'
 input_vidpath = base + video + '.avi'
 
 vidMed,vidMed_fn= functions.getMedVideo.getMedVideo(input_vidpath)

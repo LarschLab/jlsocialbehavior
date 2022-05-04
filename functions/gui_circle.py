@@ -15,12 +15,13 @@ force_input=0: can set to one to ask user for input even if csv file already exi
 """
 
 import matplotlib
-matplotlib.use('WXAgg')
 import matplotlib.pyplot as plt
+#matplotlib.use('WXAgg')
+
 import numpy as np
 import pandas as pd
 import cv2
-import wx
+#import wx
 import os
 import warnings
 
@@ -114,9 +115,9 @@ class gui_circles(object):
         else:
             print('ROIs already defined')
             self.rois=pd.read_csv(out_file,header=0,index_col=0,sep=',')
-            self.roiAll=self.rois.ix[:,0:3].values
-            self.roiSq=self.rois.ix[:,3:7].values
-            self.ArenaDiameter=self.rois.ix[:,7].values
+            self.roiAll=self.rois.iloc[:,0:3].values
+            self.roiSq=self.rois.iloc[:,3:7].values
+            self.ArenaDiameter=self.rois.iloc[:,7].values
             plt.close()
 
     #for each pick, check if still need points (want a total of 4 points)        

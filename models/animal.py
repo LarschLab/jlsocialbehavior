@@ -10,11 +10,11 @@ from models.AnimalTimeSeriesCollection import AnimalTimeSeriesCollection
 
 
 class Animal(object):
-    def __init__(self, ID=0):
+    def __init__(self, ID=0, paired=True):
         self.ID = ID
         self.pair = []
         self.ts = []
-        self.paired = True
+        self.paired = paired
         self.neighbor = None
         self.experiment = None
 

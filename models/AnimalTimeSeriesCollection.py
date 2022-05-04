@@ -28,11 +28,38 @@ import functions.peakdet as pkd
 from scipy.signal import medfilt
 
 
+
+def norm(a, keepdims=False):
+    return np.linalg.norm(a, axis=-1, keepdims=keepdims)
+
+
+def normalise(a):
+    return a / norm(a)[..., np.newaxis]
+
+
+# GEOMETRY
+
+def curvature(v, a):
+    assert (v.shape[-1]) == 2
+    assert np.all(v.shape == a.shape)
+    return (v[..., 0] * a[..., 1] - v[..., 1] * a[..., 0]) / np.power(
+        norm(v), 3
+    )
+
+def dot(x, y, keepdims=False):
+    result = np.einsum("...i,...i->...", x, y)
+    if keepdims:
+        return np.expand_dims(result, -1)
+    else:
+        return result
+
 class AnimalTimeSeriesCollection:
     def __init__(self):
         self.animalIndex = None
         self.pxPmm = None
         self.fps = None
+        self.ID = None
+        self.animal = None
 
     # Call this function from an animal class to link it with this class
     def linkAnimal(self, animal):
@@ -50,7 +77,10 @@ class AnimalTimeSeriesCollection:
 
     # function to shift fundamental time series upon loading to generate control data
     def timeShift(self, x):
-        return np.roll(x, self.animal.pair.shift[self.animal.ID], axis=0)
+        if self.animal.paired:
+            return np.roll(x, self.animal.pair.shift[self.animal.ID], axis=0)
+        else:
+            return x
 
     # --------------------------
     # fundamental time series
@@ -112,10 +142,13 @@ class AnimalTimeSeriesCollection:
         # center position on 0,0 for convenient conversion into polar coordinates.
         # using dish circle ROI from ROI file to define center
         # last column in ROI file defines radius. Add 2px because the video pieces extend 2 px beyond the circle ROI.
-        FocalID = self.animal.pair.animalIDs[0]  # get ID of the focal animal in this pair.
-        # !! This ensures that animal and stimulus are shifted by the same amount !!
-        if self.animal.pair.experiment.expInfo.rois.shape[0] != 0:
-            currCenterPx = self.animal.pair.experiment.expInfo.rois[FocalID, -1] + 2
+        if self.animal.paired:
+            FocalID = self.animal.pair.animalIDs[0]  # get ID of the focal animal in this pair.
+            # !! This ensures that animal and stimulus are shifted by the same amount !!
+            if self.animal.pair.experiment.expInfo.rois.shape[0] != 0:
+                currCenterPx = self.animal.pair.experiment.expInfo.rois[FocalID, -1] + 2
+            else:
+                currCenterPx = 0
         else:
             currCenterPx = 0
 
@@ -141,7 +174,7 @@ class AnimalTimeSeriesCollection:
         return Trajectory(x)
 
     def dd_position(self):
-        x = np.diff(self.d_position_smooth().xy, axis=0)
+        x = np.diff(self.d_position().xy, axis=0)
         return Trajectory(x)
 
     def travel_smooth(self, **kwargs):
@@ -162,7 +195,7 @@ class AnimalTimeSeriesCollection:
         return np.nansum(np.abs(self.travel()))
 
     def accel(self):
-        return np.diff(self.speed_smooth())
+        return np.diff(self.speed())
 
     def heading(self, **kwargs):  # Abandoned using this February 2019. Use trackedHeading instead!
         return mu.cart2pol(*self.d_position_smooth(**kwargs).xy.T)[0]  # heading[0] = heading, heading[1] = speed
@@ -171,8 +204,8 @@ class AnimalTimeSeriesCollection:
     def d_heading(self, **kwargs):
         return np.diff(self.heading(**kwargs))
 
-    def d_trackedHeading(self, **kwargs):
-        return np.diff(self.trackedHeading(**kwargs))
+    def d_trackedHeading(self):
+        return np.diff(self.trackedHeading())
 
     # currently, this is the position of the neighbor, relative to focal animal name is misleading...
     def position_relative_to_neighbor(self, **kwargs):
@@ -184,8 +217,8 @@ class AnimalTimeSeriesCollection:
 
         relPosPol = [mu.cart2pol(*self.position_relative_to_neighbor(**kwargs).xy.T)]
         relPosPolRot = np.squeeze(np.array(relPosPol).T)[:-1, :]
-        relPosPolRot[:, 0] = relPosPolRot[:, 0] - self.heading()
-        x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])]
+        relPosPolRot[:, 0] = relPosPolRot[:, 0] - self.heading() # subtract heading
+        x = [mu.pol2cart(relPosPolRot[:, 0], relPosPolRot[:, 1])] # transform back to cartesian
         x = np.squeeze(np.array(x).T)
         return Trajectory(x)
 
@@ -227,6 +260,11 @@ class AnimalTimeSeriesCollection:
         x = np.squeeze(np.array(x).T)
         return Trajectory(x)
 
+
+    def dd_position_relative_to_neighbor_rot(self):
+        x = np.diff(np.diff(self.position_relative_to_neighbor_rot().xy))
+        return Trajectory(x)
+
     # acceleration using rotation corrected data
     # effectively splits acceleration into speeding [0] and turning [1]
     def dd_pos_pol(self):
@@ -238,7 +276,7 @@ class AnimalTimeSeriesCollection:
     def dd_pos_pol_rot(self):
 
         x_rot = self.dd_pos_pol().xy
-        x_rot[:, 0] = x_rot[:, 0] - self.heading()[:-1]
+        x_rot[:, 0] = x_rot[:, 0] - self.heading()#[:-1]
         x_rot_cart = [mu.pol2cart(x_rot[:, 0], x_rot[:, 1])]
         x_rot_cart = np.squeeze(np.array(x_rot_cart)).T
         return Trajectory(x_rot_cart)
@@ -289,6 +327,32 @@ class AnimalTimeSeriesCollection:
     # ------Force matrices-------
     # creates force matrix (how did focal animal accelerate depending on neighbor position)
 
+
+
+    @property
+    def speedN(self):
+        return norm(self.d_position().xy[:-1,:])
+
+    @property
+    def accelerationN(self):
+        return norm(self.dd_position().xy)
+
+    @property
+    def e(self):
+        return normalise(self.d_position().xy[:-1,:])
+
+    @property
+    def tg_acceleration(self):
+        return dot(self.dd_position().xy, self.e[:-1,:])
+
+    @property
+    def curvature(self):
+        return curvature(self.d_position().xy[:-1,:], self.dd_position().xy)
+
+    @property
+    def normal_acceleration(self):
+        return np.square(self.speedN) * self.curvature
+
     # speedAndTurn - using total acceleration
     def ForceMat_speedAndTurn(self):
         mapBins = self.animal.pair.experiment.mapBins
@@ -305,7 +369,7 @@ class AnimalTimeSeriesCollection:
         position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot()
         return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                        position_relative_to_neighbor_rot.y()[1:],
-                                       self.dd_pos_pol_rot().xy[:, 0],
+                                       self.dd_pos_pol_rot().xy[1:, 0],
                                        bins=[mapBins, mapBins])[0]
 
     # turn - using only acceleration component perpendicular to heading
@@ -314,8 +378,18 @@ class AnimalTimeSeriesCollection:
         position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot()
         return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
                                        position_relative_to_neighbor_rot.y()[1:],
-                                       self.dd_pos_pol_rot().xy[:, 1],
+                                       self.dd_pos_pol_rot().xy[1:, 1],
                                        bins=[mapBins, mapBins])[0]
+
+    # turn - using only acceleration component perpendicular to heading
+    def ForceMat_turn_alt(self):
+        mapBins = self.animal.pair.experiment.mapBins
+        position_relative_to_neighbor_rot = self.position_relative_to_neighbor_rot()
+        return sta.binned_statistic_2d(position_relative_to_neighbor_rot.x()[1:],
+                                       position_relative_to_neighbor_rot.y()[1:],
+                                       self.dd_position_relative_to_neighbor_rot().xy[1:, 1],
+                                       bins=[mapBins, mapBins])[0]
+
 
     # speed - using only acceleration component aligned with heading
     def ForceMat_speed_filt(self, **kwargs):

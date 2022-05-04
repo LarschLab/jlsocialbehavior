@@ -81,6 +81,7 @@ class ExperimentMeta(object):
         self.ComputeSync = None
         self.stimulusProtocol = None
         self.allowEpisodeSwitch = None
+        self.omrRange = None
 
         self.numPairs = None
         self.txtTrajectories = None
@@ -185,7 +186,13 @@ class ExperimentMeta(object):
             vp = functions.getVideoProperties.getVideoProperties(self.aviPath)  # video properties
             # self.ffmpeginfo = vp
             self.videoDims = [int(vp['width']), int(vp['height'])]
-            self.numFrames = int(vp['nb_frames'])
+            #try:
+            #    self.numFrames = int(vp['nb_frames'])
+            #except ValueError:
+            tmp = pd.read_csv(self.trajectoryPath)
+            self.numFrames = tmp.shape[0]-2
+
+
             self.fps = int(vp['fps'])
             # self.videoDims = np.array([2048, 1280])
             # self.numFrames = 558135
@@ -248,7 +255,7 @@ class ExperimentMeta(object):
             print('episode number not specified. Using default: all')
             self.episodes = int(np.floor(((self.numFrames / self.fps) / 60) / self.episodeDur))
 
-        print('Using: ', self.episodes, ' episodes. Episode duration (minutes): ', self.episodeDur)
+        print('Using: ', self.episodes, ' episodes. Episode duration (minutes): ', self.episodeDur, 'numFrames',self.numFrames)
 
 
         try:
@@ -299,6 +306,11 @@ class ExperimentMeta(object):
             print('ComputeSync not specified. Using default: False')
             self.ComputeSync = False
 
+        try:
+            self.omrRange = expinfo['omrRange']
+        except KeyError:
+            print('omrRange not specified. Not computing OMR')
+            self.omrRange = []
 
 
         try:
@@ -408,7 +420,8 @@ class experiment(object):
         self.animals = []
         self.shiftList = None   # fix list for 'random' shifts for time shift control data.
         self.pair2animal = []
-        self.mapBins = np.linspace(-20, 20, 31)
+        self.mapBins = np.linspace(-30, 30, 63)
+        self.omr = []
 
         # imitate overload behavior
         if type(expDef) == pd.Series:       # typically, run with a pandas df row of arguments
@@ -477,6 +490,9 @@ class experiment(object):
     def linkFullAnimals(self):
         for i in range(self.expInfo.numPairs+1):# adding extra 'animal' which is stimulus!
             Animal(ID=i).joinExperiment(self)
+
+    def linkOmr(self):
+        Omr(rng=[self.expInfo.omrFrames]).joinExperiment(self)
 
     def linkFullPairs(self):#  add full traces as one long episode for easy access
 
@@ -664,7 +680,7 @@ class experiment(object):
                     nmAll[i, 1, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt(window_len=31)
                     nmAll[i, 2, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt(window_len=31)
 
-                    self.pair[i].shift = [self.shiftList[0], 0]
+                    self.pair[i].shift = [self.shiftList[0][0], 0]
                     nmAll[i, 0, 1, :, :] = self.pair[i].animals[0].ts.neighborMat_filt(window_len=31)
                     nmAll[i, 1, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt(window_len=31)
                     nmAll[i, 2, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt(window_len=31)
@@ -675,8 +691,8 @@ class experiment(object):
                     nmAll[i, 0, 0, :, :] = self.pair[i].animals[0].ts.neighborMat()
                     nmAll[i, 1, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
                     nmAll[i, 2, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
-
-                    self.pair[i].shift = [self.shiftList[0], 0]
+                    #print('hello',self.shiftList)
+                    self.pair[i].shift = [self.shiftList[0][0], 0]
                     nmAll[i, 0, 1, :, :] = self.pair[i].animals[0].ts.neighborMat()
                     nmAll[i, 1, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
                     nmAll[i, 2, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
@@ -704,6 +720,24 @@ class experiment(object):
             i += 1
         print('Computing Shoaling index: ... done.', end='')
         return np.array(si)
+
+    def computeOMR(self, rng):
+
+        lastCol=3*self.expInfo.numPairs
+        useCols=np.append(np.arange(2,lastCol,3),lastCol+3)
+        colNames = np.append(np.arange(self.expInfo.numPairs), 'episode')
+
+        dfGrat = pd.read_csv(posPath[0],
+                             delim_whitespace=True,
+                             header=None,
+                             nrows=np.diff(rng),
+                             skiprows=rng[0],
+                             usecols=useCols,
+                             names=colNames)
+
+        dfGrat['epFrame'] = np.tile(np.arange(900), 140)
+        dfGrat['epNr'] = np.repeat(np.arange(140), 900)
+        dfGrat.set_index([dfGrat.index, 'episode', 'epFrame', 'epNr'], inplace=True)
 
     def loadData(self):
         # read data for current experiment or many-dish-set
@@ -1054,27 +1088,3 @@ class experiment(object):
             self.pdfPath=self.expInfo.aviPath[:-4]+'_'+currentTime.strftime('%Y%m%d%H%M%S')+'.pdf'
             with PdfPages(self.pdfPath) as pdf:
                 pdf.savefig()
-            
-#        plt.figure()
-#        a1=self.Pair.animals[0].ForceMat
-#        a2=self.Pair.animals[1].ForceMat
-#        meanForceMat=np.nanmean(np.stack([a1,a2],-1),axis=2)
-#        outer_grid = gridspec.GridSpec(1, 1)
-#        johPlt.plotMapWithXYprojections(meanForceMat,3,outer_grid[0],31,10)
-#        
-#        plt.figure()
-#        a1=self.Pair.animals[0].ForceMat_speed
-#        a2=self.Pair.animals[1].ForceMat_speed
-#        meanForceMat=np.nanmean(np.stack([a1,a2],-1),axis=2)
-#        outer_grid = gridspec.GridSpec(1, 1)
-#        johPlt.plotMapWithXYprojections(meanForceMat,3,outer_grid[0],31,.1)
-#        
-#        plt.figure()
-#        a1=self.Pair.animals[0].ForceMat_turn
-#        a2=self.Pair.animals[1].ForceMat_turn
-#        meanForceMat=np.nanmean(np.stack([a1,a2],-1),axis=2)
-#        outer_grid = gridspec.GridSpec(1, 1)
-#        johPlt.plotMapWithXYprojections(meanForceMat,3,outer_grid[0],31,.1)
-        
-        
-        
