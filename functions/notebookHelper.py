@@ -10,6 +10,8 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 import matplotlib
 from scipy import stats
 import statsmodels.stats.api as sms
+import os
+import json
 
 
 # function to calculate Cohen's d for independent samples
@@ -21,10 +23,12 @@ def cohend(d1, d2):
     # calculate the pooled standard deviation
     s = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
     # calculate the means of the samples
-    u1, u2 = np.mean(d1), np.mean(d2)
+    u1, u2 = np.mean(d1, axis=0), np.mean(d2, axis=0)
     # calculate the effect size
     es=(u1 - u2) / s
     return es, n1, n2, s1, s2, s, u1, u2
+
+
 
 def groupCohen(x, cat='wt'):
     dat=x.copy()
@@ -44,11 +48,12 @@ def groupCohen(x, cat='wt'):
         # calculate the pooled standard deviation
         s = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
         # calculate the means of the samples
-        u1, u2 = np.mean(d1), np.mean(d2)
+        u1, u2 = np.mean(d1, axis=0), np.mean(d2, axis=0)
         # calculate the effect size
         return (u2 - u1) / s
     else:
         ret=pd.Series(np.zeros(dat.shape[1]-2) * np.nan, index=dat.columns.values[2:])
+        #ret = pd.Series(np.zeros(dat.shape[1] - 2) , index=dat.columns.values[2:])
         return ret
 
 
@@ -196,3 +201,36 @@ def powerToSample(df):
         )
         result.append(text)
     return result
+
+def file_len(fname):
+    head, tail = os.path.split(fname)
+    outf = os.path.join(head, tail[:-4]+'_meta.json')
+    readAgain = True
+
+    if os.path.exists(outf):
+        with open(outf, "r") as read_file:
+            dMeta = json.load(read_file)
+
+        if 'Len' in dMeta:
+            readAgain = False
+            print('re-using length of ', fname)
+
+    if readAgain:
+
+        with open(fname) as f:
+            print('re-reading length of ', fname)
+            for i, l in enumerate(f):
+                pass
+
+        if os.path.exists(outf):
+            with open(outf, "r") as read_file:
+                dMeta = json.load(read_file)
+            dMeta['Len']=i+1
+
+        else:
+            dMeta = {'Len': i+1}
+
+        with open(outf, "w") as write_file:
+            json.dump(dMeta, write_file)
+
+    return dMeta['Len']
