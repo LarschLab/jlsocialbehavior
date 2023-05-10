@@ -76,8 +76,10 @@ def getAnimalLength(aviPath,frames,coordinates,boxSize=200,threshold=20,invert=F
        
                 if invert:
                     crop=255-crop
-                img_binary = ImageProcessor.to_binary(crop.copy(), threshold,invertMe=False)            
-                im_tmp2,contours, hierarchy = cv2.findContours(img_binary.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                img_binary = ImageProcessor.to_binary(crop.copy(), threshold,invertMe=False)
+                #im_tmp2, contours, hierarchy = cv2.findContours(img_binary.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+                contours, hierarchy = cv2.findContours(img_binary.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 img_center=geometry.Vector(crop.shape[0]/2,crop.shape[1]/2)
     
                 cnt = ImageProcessor.get_contour_containing_point(contours,img_center)

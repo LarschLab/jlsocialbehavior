@@ -322,7 +322,20 @@ class AnimalTimeSeriesCollection:
 
     # -------simple bout analysis------
     def boutStart(self):
-        return pkd.detect_peaks(self.speed_smooth(), mph=5, mpd=8)
+        return pkd.detect_peaks(self.speed_smooth(window_len=10), mph=4, mpd=8,threshold=0)-1
+
+    def avgBout(self):
+        sp = self.speed_smooth()
+        bs = self.boutStart()
+        if bs.shape[0]>1:
+            ix=(bs>10)&(bs<sp.shape[0]-30)
+            bs=bs[ix]
+            avgBout = np.nanmean(np.array([sp[x - 5:x + 25] for x in bs]),axis=0)
+            bm = np.nanmax(avgBout)
+            bw = np.sum(avgBout[:15]>bm*0.3)
+            return [avgBout, bm, bw]
+        else:
+            return [0,0,0]
 
     # ------Force matrices-------
     # creates force matrix (how did focal animal accelerate depending on neighbor position)
