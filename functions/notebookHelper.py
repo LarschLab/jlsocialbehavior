@@ -12,6 +12,7 @@ from scipy import stats
 import statsmodels.stats.api as sms
 import os
 import json
+import re
 
 
 # function to calculate Cohen's d for independent samples
@@ -234,3 +235,10 @@ def file_len(fname):
             json.dump(dMeta, write_file)
 
     return dMeta['Len']
+
+# Load data with flexible delimiters (commas or spaces)
+def load_data_flexDelim(file_path):
+    try:
+        return np.loadtxt(file_path)
+    except Exception as e:
+        return np.loadtxt(file_path, delimiter=',')

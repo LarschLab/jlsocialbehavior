@@ -10,6 +10,7 @@ import os
 import functions.getVideoProperties
 import functions.video_functions as vf
 import functions.CameraInterceptCorrection as cic
+import functions.notebookHelper as nh
 
 def getAnimalSizeFromVideo(currAvi,rawData,camHeight, sizePercentile=40,numPairs=15, roiPath=[]):
     videoInfo = functions.getVideoProperties.getVideoProperties(currAvi)
@@ -25,7 +26,7 @@ def getAnimalSizeFromVideo(currAvi,rawData,camHeight, sizePercentile=40,numPairs
     head, tail = os.path.split(roiPath)
     #print tail
     if tail[:3]=='ROI':
-        rois=np.loadtxt(roiPath)
+        rois=nh.load_data_flexDelim(roiPath)
         correct=True
         
         #for virtual pairing, can use random frames, no need to avoid collisions

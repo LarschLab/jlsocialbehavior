@@ -7,6 +7,7 @@ import functions.getVideoProperties
 import functions.plotFunctions_joh as johPlt
 import functions.randomDotsOnCircle as randSpacing
 import functions.video_functions as vf
+import functions.notebookHelper as nh
 from models.pair import Pair
 from models.animal import Animal
 import matplotlib
@@ -401,7 +402,7 @@ class ExperimentMeta(object):
 
         else:
             print('skype roi found')
-            rois = np.loadtxt(ROIpath[0])
+            rois = nh.load_data_flexDelim(ROIpath[0])
             r_px = rois.mean(axis=0)[-1]
         roiPath = ROIpath[0]
         pxPmm = 2 * r_px / self.arenaDiameter_mm
