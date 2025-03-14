@@ -12,6 +12,9 @@ ffmpeg comand is assembled as a string - that part is not pretty...
 import subprocess as sp
 import os
 import numpy as np
+
+import functions.getMedVideo
+import functions.getVideoProperties
 import functions.video_functions as vf
 import tkFileDialog
 import functions.gui_circle as gc
@@ -30,7 +33,7 @@ def videoSplit(aviP):
     #get median background image for background division
     #vidMed,bg_file,minval2=vf.getMedVideo(aviP,9,1)
     
-    vidMed,bg_file=vf.getMedVideo(aviP,9,1)
+    vidMed,bg_file= functions.getMedVideo.getMedVideo(aviP, 9, 1)
     minval2=np.min(vidMed)-5
     bgPath=(head+'/bgMed.tif')
 
@@ -43,7 +46,7 @@ def videoSplit(aviP):
     tileList=np.array(scaleData.ix[:,3:7].values,dtype='int64')
     numTiles=np.shape(tileList)[0]
     
-    vp=vf.getVideoProperties(avi_path)
+    vp= functions.getVideoProperties.getVideoProperties(avi_path)
     fps_s=str(vp['fps'])
     
     bg_file_mask=(head+'/bgMed_mask.tif')

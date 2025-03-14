@@ -14,7 +14,7 @@ Created on Tue May 22 12:45:43 2018
 
 #need same parameters that were used during the experiment. This is currently hard coded!
 
-def deCorrectFish(x,y,xOff,yOff,xMax,xMaxCm,camHeight=79,yMax=1280.0):
+def deCorrectFish(x,y,xOff,yOff,xMax,yMax,camHeight):#camHeight default used to be 79
   
   xR=x+xOff
   yR=y+yOff
@@ -24,7 +24,7 @@ def deCorrectFish(x,y,xOff,yOff,xMax,xMaxCm,camHeight=79,yMax=1280.0):
 
   return xR-xOff,yR-yOff
 
-def CorrectFish(x,y,xOff,yOff,xMax,xMaxCm,camHeight=79,yMax=1280.0):
+def CorrectFish(x,y,xOff,yOff,xMax,yMax,camHeight): #camHeight default used to be 79
   
   xR=x+xOff
   yR=y+yOff

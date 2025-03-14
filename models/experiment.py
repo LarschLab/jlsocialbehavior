@@ -2,10 +2,14 @@ import numpy as np
 import os
 import datetime
 import glob
+
+import functions.getVideoProperties
 import functions.plotFunctions_joh as johPlt
 import functions.randomDotsOnCircle as randSpacing
 import functions.video_functions as vf
+import functions.notebookHelper as nh
 from models.pair import Pair
+from models.animal import Animal
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -24,14 +28,33 @@ import random
 
 class ExperimentMeta(object):
     # ExperimentMeta class collects file paths, arena and video parameters for one experiment
-    def __init__(self, trajectoryPath):
+    def __init__(self, expinfo):
+        self.readLim = None
 
-        self.trajectoryPathAll = np.array(trajectoryPath.split())
-        self.trajectoryFileNum = self.trajectoryPathAll.shape[0]
-        if self.trajectoryFileNum > 1:
-            self.trajectoryPath = self.trajectoryPathAll[0]
+        if isinstance(expinfo, str):
+            print('Experiment called with string input. Using all default parameters.')
+            self.trajectoryPath = expinfo
         else:
-            self.trajectoryPath = trajectoryPath
+
+            trajectoryPath = expinfo['txtPath']
+            self.trajectoryPathAll = np.array(trajectoryPath.split())
+            self.trajectoryFileNum = self.trajectoryPathAll.shape[0]
+            if self.trajectoryFileNum > 1:
+                self.trajectoryPath = self.trajectoryPathAll[0]
+            else:
+                self.trajectoryPath = trajectoryPath
+
+            try:
+                num_lines = sum(1 for line in open(self.trajectoryPath))
+                self.readLim = np.min([expinfo['readLim'], num_lines])
+                print('readLim: ' + str(self.readLim))
+            except KeyError:
+                print('readLim not specified. Using all data (default).')
+                self.readLim = None
+            except:
+                print('Could not determine readLim at this point. Using all data (default).')
+                self.readLim = None
+
 
         self.aviPath = None
         self.aspPath = None
@@ -49,14 +72,17 @@ class ExperimentMeta(object):
         self.episodePLcode = None
         self.pairListAll = None
         self.nShiftRuns = None
-        self.birthDayAll = None
-        self.expTime = None
+        self.anIDAll = None
+        self.birthDayAll = None # used to specify on loading until 2018, now adding age info from notebook
+        self.expTime = None # used to specify on loading until 2018, now adding expTime info from notebook
         self.SaveNeighborhoodMaps = None
         self.recomputeAnimalSize = None
         self.ComputeBouts = None
         self.computeLeadership = None
+        self.ComputeSync = None
         self.stimulusProtocol = None
         self.allowEpisodeSwitch = None
+        self.omrRange = None
 
         self.numPairs = None
         self.txtTrajectories = None
@@ -65,6 +91,10 @@ class ExperimentMeta(object):
         self.numFrames = None
         self.fps = None
         self.pxPmm = None
+
+        self.filteredMaps = None
+
+
 
         #Parse arguments from expinfo or use defaults with a notification.
 
@@ -78,7 +108,13 @@ class ExperimentMeta(object):
             raise
 
         try:
-            self.aviPath = expinfo['aviPath']
+            if expinfo['aviPath']=='default':
+                print('searching for default avi...')
+                head, tail = os.path.split(self.trajectoryPath)
+                self.aviPath = glob.glob(head+'\\*.avi')[0]
+                print('found: ',self.aviPath)
+            else:
+                self.aviPath = expinfo['aviPath']
             tmp = open(self.aviPath, 'r')
             tmp.close()
         except KeyError as error:
@@ -86,6 +122,10 @@ class ExperimentMeta(object):
             self.aviPath = None
 
         except TypeError as error:
+            print('No video file specified. Will resort to defaults.', error)
+            self.aviPath = None
+
+        except IndexError as error:
             print('No video file specified. Will resort to defaults.', error)
             self.aviPath = None
 
@@ -117,7 +157,12 @@ class ExperimentMeta(object):
         if self.episodePLcode:
             self.numPairs = self.pairListAll.shape[1]-1
         else:
-            self.numPairs = self.pairListAll.sum()
+            numPairs = self.pairListAll.sum()
+            if numPairs < self.pairListAll.shape[1]-1:
+                numPairs = self.pairListAll.shape[1]-1
+                print('Warning: pair list does not contain all pairs. Using ', numPairs, ' pairs.')
+
+            self.numPairs = numPairs
 
         try:
             self.arenaDiameter_mm = expinfo['arenaDiameter_mm']
@@ -144,10 +189,16 @@ class ExperimentMeta(object):
         # If a video file name is passed, collect video parameters
         if self.aviPath:
             # get video meta data
-            vp = vf.getVideoProperties(self.aviPath)  # video properties
+            vp = functions.getVideoProperties.getVideoProperties(self.aviPath)  # video properties
             # self.ffmpeginfo = vp
             self.videoDims = [int(vp['width']), int(vp['height'])]
-            self.numFrames = int(vp['nb_frames'])
+            #try:
+            #    self.numFrames = int(vp['nb_frames'])
+            #except ValueError:
+            tmp = pd.read_csv(self.trajectoryPath)
+            self.numFrames = tmp.shape[0]-2
+
+
             self.fps = int(vp['fps'])
             # self.videoDims = np.array([2048, 1280])
             # self.numFrames = 558135
@@ -159,7 +210,15 @@ class ExperimentMeta(object):
             print('Attention! Using default video parameters: ', self.videoDims, self.numFrames, self.fps)
 
         try:
+            self.camHeight = expinfo['camHeight']
+
+        except KeyError:
+            print('camHeight not specified. Using 79 cm (default).')
+            self.camHeight = 79
+
+        try:
             self.minShift = expinfo['minShift'] * self.fps
+
         except KeyError:
             print('minShift not specified. Using 60 seconds (default).')
             self.minShift = 60 * self.fps
@@ -174,6 +233,7 @@ class ExperimentMeta(object):
         try:
             self.anSizeFile = expinfo['AnSizeFile']
             tmp = open(self.anSizeFile, 'r')
+
             tmp.close()
         except KeyError:
             search = os.path.split(self.trajectoryPath)[0]
@@ -182,8 +242,9 @@ class ExperimentMeta(object):
                 self.anSizeFile = tmp[0]
                 print('AnSizeFile not specified. Found default.',self.anSizeFile)
             else:
-                print('No AnSizeFile specified and no default found.')
+
                 self.anSizeFile = -1
+                print('No AnSizeFile specified and no default found. recompute on demand')
 
         except FileNotFoundError:
             print('AnSizeFile specified but not found.')
@@ -191,13 +252,17 @@ class ExperimentMeta(object):
 
         try:
             self.episodes = expinfo['episodes']
+            maxEpisodes= int(np.floor(((self.numFrames / self.fps) / 60) / self.episodeDur))
+            if maxEpisodes<self.episodes:
+                print('Warning: more episodes specified than what is available. setting to ', maxEpisodes)
+                self.episodes=maxEpisodes
             if self.episodes == -1:
-                self.episodes = int(np.floor(((self.numFrames / self.fps) / 60) / self.episodeDur))
+                self.episodes = maxEpisodes
         except KeyError:
             print('episode number not specified. Using default: all')
             self.episodes = int(np.floor(((self.numFrames / self.fps) / 60) / self.episodeDur))
 
-        print('Using: ', self.episodes, ' episodes. Episode duration (minutes): ', self.episodeDur)
+        print('Using: ', self.episodes, ' episodes. Episode duration (minutes): ', self.episodeDur, 'numFrames',self.numFrames)
 
 
         try:
@@ -219,6 +284,12 @@ class ExperimentMeta(object):
             self.SaveNeighborhoodMaps = True
 
         try:
+            self.filteredMaps = expinfo['filteredMaps']
+        except KeyError:
+            print('filteredMaps not specified. Using default: False')
+            self.filteredMaps = False
+
+        try:
             self.recomputeAnimalSize = expinfo['recomputeAnimalSize']
         except KeyError:
             print('recomputeAnimalSize not specified. Using default: True')
@@ -237,6 +308,19 @@ class ExperimentMeta(object):
             self.ComputeBouts = True
 
         try:
+            self.ComputeSync = expinfo['ComputeSync']
+        except KeyError:
+            print('ComputeSync not specified. Using default: False')
+            self.ComputeSync = False
+
+        try:
+            self.omrRange = expinfo['omrRange']
+        except KeyError:
+            print('omrRange not specified. Not computing OMR')
+            self.omrRange = []
+
+
+        try:
             self.allowEpisodeSwitch = expinfo['allowEpisodeSwitch']
         except KeyError:
             print('allowEpisodeSwitch not specified. Using default: False')
@@ -247,6 +331,13 @@ class ExperimentMeta(object):
         except KeyError:
             print('stimulusProtocol not specified. Using default: 0')
             self.stimulusProtocol = 0
+
+        try:
+            tmp = np.array(expinfo['anIDAll'].split())
+            self.anIDAll = np.array(tmp)
+        except KeyError:
+            print('Animal IDs not specified. Using running numbers during data loading.')
+            self.anIDAll = np.arange(self.numPairs)
 
         try:
             tmp = np.array(expinfo['birthDayAll'].split())
@@ -262,7 +353,7 @@ class ExperimentMeta(object):
                 self.birthDayAll = np.array([bdl[x] for x in bdg])
 
             except KeyError:
-                print('BirthDays not specified. Cannot determine animal age.')
+                print('BirthDays not specified. Cannot determine animal age during data loading.')
                 self.birthDayAll = np.repeat(np.nan, self.numPairs)
 
             except:
@@ -272,7 +363,7 @@ class ExperimentMeta(object):
         try:
             self.expTime = expinfo['expTime']
         except KeyError:
-            print('expTime not specified. Cannot determine animal age.')
+            print('expTime not specified. Cannot determine animal age during loading.')
             self.expTime = np.repeat(np.nan, self.numPairs)
 
         try:
@@ -299,9 +390,17 @@ class ExperimentMeta(object):
             print('No skype roi found.')
             ROIpath = glob.glob(startDir + '\\bgMed_scale*')  # idTracker pipeline output
             if len(ROIpath) < 1:
-                print('No idTracker pipeline ROI found.')
-                ROIpath = None
-                raise NameError('no ROIs found')
+                ROIpath = glob.glob(startDir + '\\*bgMed.csv')  # medaka pipeline output
+                if len(ROIpath) < 1:
+
+                    print('No idTracker pipeline ROI found.')
+                    ROIpath = None
+                    raise NameError('no ROIs found')
+                else:
+                    print('medaka pipeline ROI found.')
+                    rois = np.loadtxt(ROIpath[0], skiprows=1, delimiter=',')
+                    r_px = rois.mean(axis=0)[3]
+                    print(r_px)
             else:
                 print('idTracker pipeline ROI found.')
                 rois = np.loadtxt(ROIpath[0], skiprows=1, delimiter=',')
@@ -309,7 +408,7 @@ class ExperimentMeta(object):
 
         else:
             print('skype roi found')
-            rois = np.loadtxt(ROIpath[0])
+            rois = nh.load_data_flexDelim(ROIpath[0])
             r_px = rois.mean(axis=0)[-1]
         roiPath = ROIpath[0]
         pxPmm = 2 * r_px / self.arenaDiameter_mm
@@ -324,12 +423,17 @@ class experiment(object):
         self.episodeAll = None  # time series of episode name
         self.anSize = None      # np array of animal size
         self.pair = []          # place holder for animal-pair-episodes
+        self.pair_f = []
+        self.animals = []
         self.shiftList = None   # fix list for 'random' shifts for time shift control data.
+        self.pair2animal = []
+        self.mapBins = np.linspace(-30, 30, 63)
+        self.omr = []
 
         # imitate overload behavior
         if type(expDef) == pd.Series:       # typically, run with a pandas df row of arguments
 
-            self.expInfo = ExperimentMeta(expDef['txtPath'])    # initialize meta information
+            self.expInfo = ExperimentMeta(expDef)    # initialize meta information
             print('loading data', end="")
             self.rawTra, self.episodeAll = self.loadData()      # load raw data
             print(' ...done. Shape: ', self.rawTra.shape)
@@ -345,12 +449,36 @@ class experiment(object):
             #        for x in range(self.expInfo.nShiftRuns)])
             #shiftB=shiftA+self.expInfo.minShift
 
+            ## Shifting strategy as of Dec 2019:
+
+            # generate list with pre-defined regularly spaced shift intervals for reproducible results
+            # (as opposed to randomized shift on each analysis run)
+            #
+            # shiftList is (nShifts,2) matrix
+            # nShift tuples to shift animals 1(shiftA) and 2(shiftB), respectively
+            # shift amounts are determined to cover the following range:
+            # for animal 1: from minShift to shiftMid (middle of episode duration)
+            # for animal 2: from shiftMid + minshift to episode duration - minShift (reversed order)
+            # this should ensure that all shift combinations differ > minShift but with repeating stimuli, there may be rare 'unfortunate' combinations.
+            # shiftMid is calculated based on episodeDur(minutes), --> resulting unit = frames
+            # expInfo.minShift is specified in seconds as input argument via notebook and transformed to frames in the expInfo class.
+
+            # During calculation of Shoaling Index, all shifts are used to create a mean null expectation.
+            # For saved neighborhood maps, only one shift is used by default to save time.
+
+
             shiftMid=int(0.5*self.expInfo.episodeDur*self.expInfo.fps*60)
-            shiftA= np.linspace(self.expInfo.minShift,shiftMid,self.expInfo.nShiftRuns).astype('int')
-            shiftB = np.linspace(shiftMid+self.expInfo.minShift,2*shiftMid-self.expInfo.minShift,self.expInfo.nShiftRuns).astype('int')[::-1]
+            shiftA= np.linspace(self.expInfo.minShift,
+                                shiftMid,
+                                self.expInfo.nShiftRuns).astype('int')
+            shiftB = np.linspace(shiftMid+self.expInfo.minShift,
+                                 2*shiftMid-self.expInfo.minShift,
+                                 self.expInfo.nShiftRuns).astype('int')[::-1]
 
 
             self.shiftList = np.array([shiftA, shiftB])
+            self.linkFullAnimals()
+            self.linkFullPairs()
             self.splitToPairs()                                 # Split raw data table into animal-pair-episodes
             self.saveExpData()                                  # compute and collect pair statistics
 
@@ -365,6 +493,37 @@ class experiment(object):
         else:
             print('Wrong experiment definition argument. Provide TxtPath or pd.Series')
             raise FileNotFoundError
+
+    def linkFullAnimals(self):
+        for i in range(self.expInfo.numPairs+1):# adding extra 'animal' which is stimulus!
+            Animal(ID=i).joinExperiment(self)
+
+    def linkOmr(self):
+        Omr(rng=[self.expInfo.omrFrames]).joinExperiment(self)
+
+    def linkFullPairs(self):#  add full traces as one long episode for easy access
+
+        if self.expInfo.episodePLcode:
+            print('PL code used, omitting FullPairs.')
+        else:
+            pairList = self.expInfo.pairListAll
+
+            for p in range(self.expInfo.numPairs):
+
+                currPartnerAll = np.where(pairList[:, p])[0]
+                #set currPartnerAll to length of pairList if it is empty    # this is a workaround for the case where a pair is not present in the pair list
+                if not currPartnerAll.size:
+                    currPartnerAll = np.array([pairList.shape[0]-1])
+                    print('pair not found in pair list. using stimulus as partner.')
+
+
+                for mp in range(currPartnerAll.shape[0]):
+                    currPartner = currPartnerAll[mp]
+                    Pair(shift=[0,0],
+                         animalIDs=[p, currPartner],
+                         epiNr=0,
+                         rng=[0, self.expInfo.numFrames],
+                         fullAn=True).joinExperiment(self)
 
     def splitToPairs(self):
         # Split raw data table into animal-pair-episodes
@@ -381,6 +540,7 @@ class experiment(object):
         fps = self.expInfo.fps
         episodeDur = self.expInfo.episodeDur  # expected in minutes
         episodeFrames = fps * episodeDur * 60
+        pair2animal = []
 
         for i in range(episodes):
 
@@ -393,6 +553,8 @@ class experiment(object):
                 blockEpisodes = self.episodeAll[rng[0]:rng[1]]
 
                 if np.unique(blockEpisodes).shape[0] > 1:
+                    print(np.unique(self.episodeAll))
+                    print(offset,rng)
                     offset = offset + np.where(np.abs(np.diff(blockEpisodes)) > 0)[0][0]+1
                     print('episode transition detected at episode: ', i, '. applying offset: ', offset)
                     rng = np.array([offset + (i * episodeFrames), offset + ((i + 1) * episodeFrames)]).astype('int')
@@ -410,6 +572,7 @@ class experiment(object):
             if self.expInfo.episodePLcode:
                 pairListNr = int(epCurr[:2])
                 pairList = self.expInfo.pairListAll[pairListNr * 16:(pairListNr + 1) * 16, :]
+                print('warning: using PL code for pair list. This will only work for 16 animals.')
             else:
                 pairList = self.expInfo.pairListAll
 
@@ -417,9 +580,16 @@ class experiment(object):
 
                 currPartnerAll = np.where(pairList[:, p])[0]
 
+                #set currPartnerAll to length of pairList if it is empty    # this is a workaround for the case where a pair is not present in the pair list
+                if not currPartnerAll.size:
+                    currPartnerAll = np.array([pairList.shape[0]-1])
+                    print('pair not found in pair list. using stimulus (',currPartnerAll,') as partner for animal ', p)
+
                 for mp in range(currPartnerAll.shape[0]):
                     currPartner = currPartnerAll[mp]
-                    Pair(shift=0, animalIDs=[p, currPartner], epiNr=i, rng=rng).linkExperiment(self)
+                    Pair(shift=[0,0], animalIDs=[p, currPartner], epiNr=i, rng=rng).joinExperiment(self)
+                    pair2animal.append(p)
+        self.pair2animal = np.array(pair2animal)
 
     def saveExpData(self):
 
@@ -435,6 +605,7 @@ class experiment(object):
         episodeName = self.episodeAll[episodeStartFrame]
         epiNr = np.array([x.epiNr for x in self.pair])
         bd = self.expInfo.birthDayAll[AnimalIndex]
+        anID = self.expInfo.anIDAll[AnimalIndex]
         if np.shape(self.anSize):
             anSize = self.anSize[AnimalIndex]
         else:
@@ -462,6 +633,14 @@ class experiment(object):
         else:
             boutDur = 0
 
+        if self.expInfo.ComputeSync == 1:
+            print('Synchronization ... ', end='')
+            sync = np.array([x.crossCorrStimAn() for x in self.pair])
+            sync_amp=[x[0] for x in sync]
+            sync_t=[x[1] for x in sync]
+        else:
+            sync_amp=0
+            sync_t=0
 
         print(' done.')
 
@@ -474,23 +653,13 @@ class experiment(object):
         except:
             print('Could not compute animal age at experiment date. Using default: 0')
             ageAll = np.zeros(avgSpeed.shape)
-            raise
 
-        #print(animalSet.shape,
-        #      AnimalIndex.shape,
-        #      cp.shape,
-        #      si.shape,
-        #      episodeName.squeeze().shape,
-        #      episodeStartFrame.shape,
-        #      inDishTime.shape,
-        #      epiNr.shape,
-        #      tRun.shape,
-        #      bd.shape,
-        #      ageAll.shape)
+
 
         df = pd.DataFrame(
             {'animalSet': animalSet,
              'animalIndex': AnimalIndex,
+             'animalID': anID,
              'CurrentPartner': cp,
              'si': si,
              'episode': episodeName.squeeze(),
@@ -508,6 +677,8 @@ class experiment(object):
         df['thigmoIndex'] = thigmoIndex
         df['boutDur'] = boutDur
         df['leadershipIndex'] = leadershipIndex
+        df['sync_amp'] = sync_amp
+        df['sync_t'] = sync_t
 
         txtFn = os.path.split(self.expInfo.trajectoryPath)[1]
         csvFileOut = os.path.join(self.expInfo.processingDir, txtFn[:-4] + '_siSummary_epi' + str(self.expInfo.episodeDur) + '.csv')
@@ -515,18 +686,37 @@ class experiment(object):
 
         if self.expInfo.SaveNeighborhoodMaps:
             numepiAll = self.expInfo.episodes * self.expInfo.numPairs
-            nmAll = np.zeros((numepiAll, 3, 2, 62, 62))  # animal,[neighbor,speed,turn],[data,shuffle0],[mapDims]
+            nmAll = np.zeros((numepiAll, 3, 2, self.mapBins.shape[0]-1, self.mapBins.shape[0]-1))  # animal,[neighbor,speed,turn, neighbor filt,speed filt,turn filt],[data,shuffle0],[mapDims]
             #print('Computing neighborhood maps... ', end="\r", flush=True)
             print('Computing neighborhood maps... ', end="")
             for i in range(numepiAll):
-                nmAll[i, 0, 0, :, :] = self.pair[i].animals[0].ts.neighborMat()
-                nmAll[i, 1, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
-                nmAll[i, 2, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
-                self.pair[i].shift = self.shiftList[0]
-                nmAll[i, 0, 1, :, :] = self.pair[i].animals[0].ts.neighborMat()
-                nmAll[i, 1, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
-                nmAll[i, 2, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
-                self.pair[i].shift = 0
+
+                if self.expInfo.filteredMaps:
+
+                    # using smoothed post-hoc heading
+                    nmAll[i, 0, 0, :, :] = self.pair[i].animals[0].ts.neighborMat_filt(window_len=31)
+                    nmAll[i, 1, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt(window_len=31)
+                    nmAll[i, 2, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt(window_len=31)
+
+                    self.pair[i].shift = [self.shiftList[0][0], 0]
+                    nmAll[i, 0, 1, :, :] = self.pair[i].animals[0].ts.neighborMat_filt(window_len=31)
+                    nmAll[i, 1, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed_filt(window_len=31)
+                    nmAll[i, 2, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn_filt(window_len=31)
+
+                else:
+
+                    # using tracked heading
+                    nmAll[i, 0, 0, :, :] = self.pair[i].animals[0].ts.neighborMat()
+                    nmAll[i, 1, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
+                    nmAll[i, 2, 0, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
+                    #print('hello',self.shiftList)
+                    self.pair[i].shift = [self.shiftList[0][0], 0]
+                    nmAll[i, 0, 1, :, :] = self.pair[i].animals[0].ts.neighborMat()
+                    nmAll[i, 1, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_speed()
+                    nmAll[i, 2, 1, :, :] = self.pair[i].animals[0].ts.ForceMat_turn()
+
+                self.pair[i].shift = [0, 0]
+
             #print(' done. Saving maps...', end="\r", flush=True)
             print(' done. Saving maps...', end="")
             npyFileOut = os.path.join(self.expInfo.processingDir, txtFn[:-4] + 'MapData.npy')
@@ -549,62 +739,91 @@ class experiment(object):
         print('Computing Shoaling index: ... done.', end='')
         return np.array(si)
 
+    def computeOMR(self, rng):
+
+        lastCol=3*self.expInfo.numPairs
+        useCols=np.append(np.arange(2,lastCol,3),lastCol+3)
+        colNames = np.append(np.arange(self.expInfo.numPairs), 'episode')
+
+        dfGrat = pd.read_csv(posPath[0],
+                             delim_whitespace=True,
+                             header=None,
+                             nrows=np.diff(rng),
+                             skiprows=rng[0],
+                             usecols=useCols,
+                             names=colNames)
+
+        dfGrat['epFrame'] = np.tile(np.arange(900), 140)
+        dfGrat['epNr'] = np.repeat(np.arange(140), 900)
+        dfGrat.set_index([dfGrat.index, 'episode', 'epFrame', 'epNr'], inplace=True)
+
     def loadData(self):
         # read data for current experiment or many-dish-set
         # begin by reading first line to determine format
         #print(' ', self.expInfo.trajectoryPath, end="\r", flush=True)
-        print(' ', self.expInfo.trajectoryPath, end="")
+        print(' ','file: ', self.expInfo.trajectoryPath, end="")
         VRformat = False
-        firstLine = pd.read_csv(self.expInfo.trajectoryPath,
-                                header=None,
-                                nrows=1,
-                                sep=':')
-
-        if firstLine.values[0][0][0] == '(':
-            rawData = pd.read_csv(self.expInfo.trajectoryPath,
-                                  sep=',|\)|\(',
-                                  engine='python',
-                                  index_col=None,
-                                  header=None,
-                                  skipfooter=1,
-                                  usecols=[2, 3, 6, 7, 10],
-                                  names=np.arange(5))
-            episodeAll = rawData[4]
-            rawData=rawData.drop(rawData.columns[[4]], axis=1).astype(float)
-            rawData.insert(loc=2,column='o1',value=0)
-            rawData.insert(loc=5, column='o2', value=0)
-            print('old bonsai format detected')
-            # rawData= mat.reshape((mat.shape[0],2,2))
-
-        elif firstLine.values[0][0][0] == 'X':
-            rawData = pd.read_csv(self.expInfo.trajectoryPath,
-                                  header=None,
-                                  delim_whitespace=True,
-                                  skiprows=1)
-            print('found idTracker csv')
+        if self.expInfo.trajectoryPath[-3:]=='npy':
+            #idtrackerai output
+            raw=np.load(self.expInfo.trajectoryPath)
+            tmp = np.dstack([raw, np.zeros((raw.shape[:2]))])
+            tmp = tmp.reshape((tmp.shape[0], 3 * raw.shape[1]))
+            rawData=pd.DataFrame(tmp)
             episodeAll = np.zeros(rawData.shape[0])
-            #episodeAll = pd.DataFrame(np.zeros(rawData.shape[0]))
+        else:
+            firstLine = pd.read_csv(self.expInfo.trajectoryPath,
+                                    header=None,
+                                    nrows=1,
+                                    sep=':')
 
-        else:  # default for all bonsai VR experiments since mid 2017
-            VRformat = True
-            rawData = pd.read_csv(self.expInfo.trajectoryPath,
-                                  header=None,
-                                  delim_whitespace=True)
-            episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
+            if firstLine.values[0][0][0] == '(':
+                rawData = pd.read_csv(self.expInfo.trajectoryPath,
+                                      sep=',|\)|\(',
+                                      engine='python',
+                                      index_col=None,
+                                      header=None,
+                                      skipfooter=1,
+                                      usecols=[2, 3, 6, 7, 10],
+                                      names=np.arange(5))
+                episodeAll = rawData[4]
+                rawData=rawData.drop(rawData.columns[[4]], axis=1).astype(float)
+                rawData.insert(loc=2,column='o1',value=0)
+                rawData.insert(loc=5, column='o2', value=0)
+                print('old bonsai format detected')
+                # rawData= mat.reshape((mat.shape[0],2,2))
 
-        if (self.expInfo.trajectoryFileNum > 1) and VRformat:
-            print('More than one trajectory file, loading all:', end='\r')
-            fnCombinedData = self.expInfo.trajectoryPathAll[-1][:-7]+'all'+'.h5'
-            if np.equal(~os.path.isfile(fnCombinedData), -1):
-                self.batchToHdf(fnCombinedData)
+            elif firstLine.values[0][0][0] == 'X':
+                rawData = pd.read_csv(self.expInfo.trajectoryPath,
+                                      header=None,
+                                      delim_whitespace=True,
+                                      skiprows=1)
+                print('found idTracker csv')
+                episodeAll = np.zeros(rawData.shape[0])
+                #episodeAll = pd.DataFrame(np.zeros(rawData.shape[0]))
 
-            print(' Reading combined data.')
-            hdf = pd.HDFStore(fnCombinedData)
-            rawData = hdf['rawData']
-            rawData = rawData.reset_index().drop('index', axis=1)
-            # pd.read_csv(fnCombinedData, header=None, delim_whitespace=True)
-            hdf.close()
-            episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
+            else:  # default for all bonsai VR experiments since mid 2017
+                VRformat = True
+                rawData = pd.read_csv(self.expInfo.trajectoryPath,
+                                      header=None,
+                                      delim_whitespace=True,
+                                      nrows=self.expInfo.readLim)
+                print('VRtrack: '+self.expInfo.trajectoryPath + str(self.expInfo.readLim))
+                episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
+
+            if (str(self.expInfo) is False) and (self.expInfo.trajectoryFileNum > 1) and VRformat:
+                print('More than one trajectory file, loading all:', end='\r')
+                fnCombinedData = self.expInfo.trajectoryPathAll[-1][:-7]+'all'+'.h5'
+                if np.equal(~os.path.isfile(fnCombinedData), -1):
+                    self.batchToHdf(fnCombinedData)
+
+                print(' Reading combined data.')
+                hdf = pd.HDFStore(fnCombinedData)
+                rawData = hdf['rawData']
+                rawData = rawData.reset_index().drop('index', axis=1)
+                # pd.read_csv(fnCombinedData, header=None, delim_whitespace=True)
+                hdf.close()
+                episodeAll = np.array(rawData.loc[:, rawData.columns[-1]])
+
         return rawData, episodeAll
 
     def batchToHdf(self, fnCombinedData):
@@ -648,12 +867,16 @@ class experiment(object):
     def getAnimalSize(self):
 
         if self.expInfo.anSizeFile == -1:
+
             anSize = getAnimalSizeFromVideo(currAvi=self.expInfo.aviPath,
                                             rawData=self.rawTra,
                                             numPairs=self.expInfo.numPairs,
-                                            roiPath=self.expInfo.roiPath)
+                                            roiPath=self.expInfo.roiPath,
+                                            camHeight=self.expInfo.camHeight)/self.expInfo.pxPmm
 
+            self.expInfo.anSizeFile = self.expInfo.trajectoryPath[:-4]+'_anSize.csv'
             print('saving anSize to', self.expInfo.anSizeFile)
+
             np.savetxt(self.expInfo.anSizeFile, anSize)
             print('Animal Size saved.')
         else:
@@ -663,11 +886,17 @@ class experiment(object):
                 anSize = np.loadtxt(self.expInfo.anSizeFile)
         return anSize
 
+    def addPair(self, pair):
+        if pair.fullAn:
+            self.pair_f.append(pair)
+            return self.pair_f[-1]
+        else:
+            self.pair.append(pair)
+            return self.pair[-1]
 
-    def addPair(self,pair):
-
-        self.pair.append(pair)
-        return self.pair[-1]
+    def addAnimal(self, animal):
+        self.animals.append(animal)
+        return self.animals[-1]
       
     def load_animalShapeParameters(self):
         
@@ -877,27 +1106,3 @@ class experiment(object):
             self.pdfPath=self.expInfo.aviPath[:-4]+'_'+currentTime.strftime('%Y%m%d%H%M%S')+'.pdf'
             with PdfPages(self.pdfPath) as pdf:
                 pdf.savefig()
-            
-#        plt.figure()
-#        a1=self.Pair.animals[0].ForceMat
-#        a2=self.Pair.animals[1].ForceMat
-#        meanForceMat=np.nanmean(np.stack([a1,a2],-1),axis=2)
-#        outer_grid = gridspec.GridSpec(1, 1)
-#        johPlt.plotMapWithXYprojections(meanForceMat,3,outer_grid[0],31,10)
-#        
-#        plt.figure()
-#        a1=self.Pair.animals[0].ForceMat_speed
-#        a2=self.Pair.animals[1].ForceMat_speed
-#        meanForceMat=np.nanmean(np.stack([a1,a2],-1),axis=2)
-#        outer_grid = gridspec.GridSpec(1, 1)
-#        johPlt.plotMapWithXYprojections(meanForceMat,3,outer_grid[0],31,.1)
-#        
-#        plt.figure()
-#        a1=self.Pair.animals[0].ForceMat_turn
-#        a2=self.Pair.animals[1].ForceMat_turn
-#        meanForceMat=np.nanmean(np.stack([a1,a2],-1),axis=2)
-#        outer_grid = gridspec.GridSpec(1, 1)
-#        johPlt.plotMapWithXYprojections(meanForceMat,3,outer_grid[0],31,.1)
-        
-        
-        

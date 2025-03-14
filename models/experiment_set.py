@@ -64,25 +64,38 @@ anSizeAll.csv
 
 from tkinter import filedialog as tkFileDialog
 from models.experiment import experiment
+import functions.matrixUtilities_joh as mu
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import matplotlib
 from datetime import datetime
+import glob
+import pandas as pd
+import numpy as np
 
 
 class experiment_set(object):
-    def __init__(self, csvFile=[]):
+    def __init__(self, csvFile=[], MissingOnly=False):
         
         self.csvFile = csvFile
         if not self.csvFile:
             self.csvFile = tkFileDialog.askopenfilename()
-
+        self.MissingOnly = MissingOnly
         self.df = None
         self.experiments = None
         self.pdf = None
-
+        self.numExpts = None
         self.process_csv_experiment_list()
+
+
+    def getAnimalPerExp(self):
+        a=np.array([e.expInfo.numPairs for e in self.experiments])
+        b=np.arange(a.shape[0])
+        z = np.concatenate([np.repeat(c, d) for c, d in zip(b, a)])
+        e=np.concatenate([np.arange(x) for x in a])
+        return a, z,e
+
 
     def process_csv_experiment_list(self):
 
@@ -90,11 +103,20 @@ class experiment_set(object):
         self.experiments = []
 
         numExpts = self.df.shape[0]
+        self.numExpts = numExpts
 
         for index, row in self.df.iterrows():
 
-            print('processing: ', index + 1, ' out of ', numExpts, 'experiments')
-            self.experiments.append(experiment(row))
+            #print(row)
+            tp=row['txtPath']
+            tf=mu.splitall(tp)[-1][:-4]
+            pdir=row['ProcessingDir']
+            sf=glob.glob(pdir+tf+'*siSummary*.csv')
+            print((not(self.MissingOnly)) , (sf==[]), pdir+tf+'*siSummary*.csv')
+            if (not(self.MissingOnly)) | (sf==[]):
+
+                print('processing: ', index + 1, ' out of ', numExpts, 'experiments')
+                self.experiments.append(experiment(row))
 
     def saveExperimentOverviewPDF(self, experiment, label):
         # save pdf summary in same foldera as csv

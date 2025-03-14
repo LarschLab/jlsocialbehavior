@@ -14,7 +14,7 @@ import warnings
 class Pair(object):
     # Class defining one pair of animals during one experiment episode
 
-    def __init__(self, shift=[0,0], animalIDs=[0, 1], rng=[], epiNr=None):
+    def __init__(self, shift=[0,0], animalIDs=[0, 1], rng=[], epiNr=None,fullAn=False):
 
         self.epiNr = epiNr          # Episode number to use in this instance
         self.shift = shift          # tags pair for calculation of control shifted data
@@ -22,23 +22,19 @@ class Pair(object):
         self.animals = []           # Place holder for list of animal instances
         self.experiment = None      # Place holder for parent experiment reference
         self.rng = None             # Place holder for range of frames belonging to this pair-episode
-
+        self.fullAn = fullAn        # tags pair as full experiment data. Append to pair_f in experiment.
         self.rng = rng
 
     def addAnimal(self, animal):
         self.animals.append(animal)
         return self.animals[animal.ID]
 
-    def linkExperiment(self, experiment):
+    def joinExperiment(self, experiment):
         self.experiment = experiment
         experiment.addPair(self)
 
-        fps = self.experiment.expInfo.fps
-        episodeDur = self.experiment.expInfo.episodeDur  # expected in minutes
-        episodeFrames = fps * episodeDur * 60
-
         for i in range(2):
-            Animal(i).joinPair(self)
+            Animal(ID=i).joinPair(self)
 
         for i in range(2):
             self.animals[i].wakeUp()
@@ -123,6 +119,12 @@ class Pair(object):
         a2 = np.nanmean(self.animals[1].ts.speed())
         return np.array([a1, a2])
 
+    def a1SpeedTrace_smooth(self):
+        return np.array(self.animals[0].ts.speed_smooth())
+
+    def a1SpeedTrace(self):
+        return np.array(self.animals[0].ts.speed())
+
     def avgSpeed_smooth(self):
         a1 = np.nanmean(self.animals[0].ts.speed_smooth())
         a2 = np.nanmean(self.animals[1].ts.speed_smooth())
@@ -132,6 +134,17 @@ class Pair(object):
         mov = []
         mov.append([x.ts.positionPol().y() for x in self.animals])
         return np.nanmax(mov)
+
+    def crossCorrStimAn(self):
+
+        an = self.animals[0].ts.speed_smooth()
+        an[np.isnan(an)]=0
+        an = an-np.nanmean(an)
+        st = self.animals[1].ts.speed_smooth()
+        st[np.isnan(st)] = 0
+        st = st-np.nanmean(st)
+        cc = np.correlate(st, an[:-20], mode='valid')
+        return np.nanmin(cc), np.nanargmin(cc), np.nanmax(cc), np.nanargmax(cc)
 
     def get_var_from_all_animals(self, var):
         #this function returns a specified variable from all animals as a matrix.
