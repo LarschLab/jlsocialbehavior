@@ -157,7 +157,12 @@ class ExperimentMeta(object):
         if self.episodePLcode:
             self.numPairs = self.pairListAll.shape[1]-1
         else:
-            self.numPairs = self.pairListAll.sum()
+            numPairs = self.pairListAll.sum()
+            if numPairs < self.pairListAll.shape[1]-1:
+                numPairs = self.pairListAll.shape[1]-1
+                print('Warning: pair list does not contain all pairs. Using ', numPairs, ' pairs.')
+
+            self.numPairs = numPairs
 
         try:
             self.arenaDiameter_mm = expinfo['arenaDiameter_mm']
@@ -228,6 +233,7 @@ class ExperimentMeta(object):
         try:
             self.anSizeFile = expinfo['AnSizeFile']
             tmp = open(self.anSizeFile, 'r')
+
             tmp.close()
         except KeyError:
             search = os.path.split(self.trajectoryPath)[0]
@@ -505,6 +511,11 @@ class experiment(object):
             for p in range(self.expInfo.numPairs):
 
                 currPartnerAll = np.where(pairList[:, p])[0]
+                #set currPartnerAll to length of pairList if it is empty    # this is a workaround for the case where a pair is not present in the pair list
+                if not currPartnerAll.size:
+                    currPartnerAll = np.array([pairList.shape[0]-1])
+                    print('pair not found in pair list. using stimulus as partner.')
+
 
                 for mp in range(currPartnerAll.shape[0]):
                     currPartner = currPartnerAll[mp]
@@ -561,12 +572,18 @@ class experiment(object):
             if self.expInfo.episodePLcode:
                 pairListNr = int(epCurr[:2])
                 pairList = self.expInfo.pairListAll[pairListNr * 16:(pairListNr + 1) * 16, :]
+                print('warning: using PL code for pair list. This will only work for 16 animals.')
             else:
                 pairList = self.expInfo.pairListAll
 
             for p in range(numPairs):
 
                 currPartnerAll = np.where(pairList[:, p])[0]
+
+                #set currPartnerAll to length of pairList if it is empty    # this is a workaround for the case where a pair is not present in the pair list
+                if not currPartnerAll.size:
+                    currPartnerAll = np.array([pairList.shape[0]-1])
+                    print('pair not found in pair list. using stimulus (',currPartnerAll,') as partner for animal ', p)
 
                 for mp in range(currPartnerAll.shape[0]):
                     currPartner = currPartnerAll[mp]

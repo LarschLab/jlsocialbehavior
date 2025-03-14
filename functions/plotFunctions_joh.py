@@ -77,10 +77,10 @@ def plotGroupComparison(data, groups, param, labels):
                       hue='group',
                       data=data,
                       ax=ax[i],
-                      join=False,
+                      linestyle='none',
                       hue_order=groups,
                       order=groups,
-                      color='k',
+                      palette='dark:k',
                       # legend=True,
                       # palette=palSimpleBar,
                       errorbar='sd')
