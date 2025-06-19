@@ -343,7 +343,7 @@ class ExperimentMeta(object):
             tmp = np.array(expinfo['birthDayAll'].split())
             tmp = [datetime.strptime(x, '%Y-%m-%d-%H-%M') for x in tmp]
             self.birthDayAll = np.array(tmp)
-        except KeyError:
+        except:
 
             try:
                 bdg = np.array(expinfo['bdGroup'].split()).astype('int8')
@@ -352,13 +352,11 @@ class ExperimentMeta(object):
 
                 self.birthDayAll = np.array([bdl[x] for x in bdg])
 
-            except KeyError:
+            except:
                 print('BirthDays not specified. Cannot determine animal age during data loading.')
                 self.birthDayAll = np.repeat(np.nan, self.numPairs)
 
-            except:
-                print('sth went wrong with birthdays.')
-                raise
+
 
         try:
             self.expTime = expinfo['expTime']
@@ -644,9 +642,12 @@ class experiment(object):
 
         print(' done.')
 
-
-        expStart = datetime.strptime(self.expInfo.expTime, '%Y-%m-%d %H:%M:%S')
-        tRun = np.array([expStart + timedelta(minutes=x) for x in inDishTime])
+        try:
+            expStart = datetime.strptime(self.expInfo.expTime, '%Y-%m-%d %H:%M:%S')
+            tRun = np.array([expStart + timedelta(minutes=x) for x in inDishTime])
+        except:
+            
+            tRun = np.array(inDishTime)
 
         try:
             ageAll = np.array([(expStart - x).days for x in bd])
@@ -778,7 +779,7 @@ class experiment(object):
 
             if firstLine.values[0][0][0] == '(':
                 rawData = pd.read_csv(self.expInfo.trajectoryPath,
-                                      sep=',|\)|\(',
+                                      #sep=',|\)|\(',
                                       engine='python',
                                       index_col=None,
                                       header=None,
