@@ -1,5 +1,68 @@
 # Recent Changes - Notebook Figure Workflows
 
+### 2026-09-16 - Explain per-fish arena-use evenness
+
+- Slice goal: Make the evenness calculation in `ShoalingTrajectoryGrid_2026.ipynb` readable without changing its behavior.
+- What changed: Expanded comments in the per-fish evenness cell to explain sampled occupancy time, the percentile radius and approximate bin mask, Shannon normalization including unvisited bins, coverage versus evenness, pooled zMAD flags, edge cases, and exports.
+- Rerun implications: None; executable code, saved outputs, and notebook metadata are unchanged.
+- Validation performed: Parsed notebook JSON, verified identical executable AST for the edited cell, and checked that all other cells, outputs, and metadata match the pre-edit notebook.
+
+### 2026-09-16 - Switchable QTL QC selection-family thresholds
+
+- Slice goal: Support global pooled QC cutoffs or separate Sel1 and Sel3 cutoffs for each QC metric.
+- What changed: `QTLQualityControl.ipynb` now exposes `QC_THRESHOLD_MODE`; `'global'` preserves the pooled zMAD reference, while `'selection_family'` calculates independent Sel1/Sel3 references and uses the pooled reference only for other lines. Section 7 draws both families' lower and upper threshold lines in the latter mode.
+- Rerun implications: After changing the threshold mode, rerun from the QC-flag calculation through the dependent tables and figures.
+- Validation performed: Parsed notebook JSON and all code cells; synthetic global and selection-family flag checks plus a Section 7 threshold-line plot smoke test.
+
+### 2026-09-16 - QTL QC distributions by selection line
+
+- Slice goal: Compare all F2 QC-metric distributions across the individual Sel1 and Sel3 lines.
+- What changed: Added a five-panel boxplot grid to `QTLQualityControl.ipynb`, with Sel1 lines first, Sel3 lines second, and PNG/PDF export through the notebook's existing figure helper.
+- Rerun implications: Rerun the notebook through the QC-table and new selection-line plotting sections to refresh `qtl_qc_metrics_by_selection_line`.
+- Validation performed: Notebook JSON and code-cell syntax checks plus a synthetic selection-line plotting smoke test.
+
+### 2026-09-16 - QTL QC deterministic scatter overlays
+
+- Slice goal: Keep QTL QC outlier markers aligned with their individual fish points.
+- What changed: Restored deterministic Matplotlib scatter layers in the per-metric and final SI experiment plots, so colored QC overlays use the same x position as their gray base point and legends remain concise.
+- Rerun implications: Rerun the QTL QC plotting sections to refresh the displayed and saved figures; no data-processing rerun is required.
+- Validation performed: Parsed and compiled the notebook and smoke-rendered both affected plotting functions with synthetic multi-experiment data.
+
+### 2026-09-15 - Editable QTL QC pointplot limits
+
+- Slice goal: Allow manual y-axis ranges when reviewing QC pointplot outliers.
+- What changed: `QTLQualityControl.ipynb` now exposes `QC_POINTPLOT_Y_LIMITS`, with independent `(lower, upper)` overrides for every QC metric and automatic scaling retained by default.
+- Rerun implications: Edit the desired limits in settings and rerun the pointplot section to regenerate figures.
+- Validation performed: Compiled notebook code and smoke-rendered automatic and explicit-limit metric plots.
+
+### 2026-09-15 - Unified QTL QC time-window modes
+
+- Slice goal: Apply one user-selected time-window method to every QTL QC metric.
+- What changed: `QTLQualityControl.ipynb` now switches between an exact continuous raw-recording window and episode-based in-dish selection; the shared selected frames drive both canonical summary aggregation and raw-trajectory evenness.
+- Rerun implications: Changing method or either window requires rerunning from settings; versioned cache keys prevent reuse across incompatible frame selections.
+- Validation performed: Tested switch validation, continuous boundary alignment, both real-data modes, summary-block completeness, trajectory-grid evenness agreement, and notebook plotting.
+
+### 2026-09-15 - QTL QC pointplot readability
+
+- Slice goal: Make the experiment-level QC plots easier to read without changing their data or statistics.
+- What changed: `QTLQualityControl.ipynb` now labels experiments with unique `lineSet_s<setup>` names and uses taller, editable heights for the five metric pointplots and final annotated SI plot.
+- Rerun implications: Rerun from summary loading to rebuild the concise labels, then rerun the plot sections to refresh saved figures.
+- Validation performed: Checked label uniqueness and smoke-rendered the experiment-level figures with the full 595-fish dataset.
+
+### 2026-09-15 - QTL QC global sample identifiers
+
+- Slice goal: Correct the QTL QC sample count and metadata labels by using `AllAn.QTLID` as the global F2 fish identifier.
+- What changed: `QTLQualityControl.ipynb` now maps summary `animalIndex` through each experiment's `anNr` roster before joining `QTLID`, and uses `QTLID` throughout QC tables, trajectory-evenness joins, exports, and plot identities.
+- Rerun implications: Rerun from the metadata-loading section; the versioned trajectory cache key prevents reuse of caches with the old identifier payload.
+- Validation performed: Checked F2 identifier uniqueness, repeated-local-index mapping, notebook syntax, and NAS-backed experiment coverage.
+
+### 2026-09-14 - Self-contained QTL quality-control notebook
+
+- Slice goal: Review F2 QTL fish for pooled-distribution outliers in speed, thigmotaxis, space-use evenness, animal size, and bout duration while retaining individual shoaling index.
+- What changed: Added `Analyses/QTLmapping/QTLQualityControl.ipynb` with editable date/window settings, notebook-local loading and trajectory functions, global two-sided zMAD flags, coverage and flagged tables, per-experiment metric plots, SI correlations, a ranked zMAD heatmap, and a final SI plot with colored multi-metric overlays and outlier counts.
+- Rerun implications: Run from the settings cell with NAS access; changing cohort, time-window, trajectory, binning, or threshold settings requires rerunning downstream cells, while compatible trajectory blocks can reuse notebook-specific caches.
+- Validation performed: Parsed the notebook JSON, compiled all code cells, and smoke-ran entropy, pooled zMAD, all metric plots, correlations, the zMAD heatmap, and multi-metric SI overlays on synthetic multi-experiment data. Real-data NAS execution remains a documented acceptance step.
+
 ### 2026-09-11 - QTL fish counts by selection line
 
 - Slice goal: Show both the available metadata fish and the date-filtered QTL fish used for each selection line in the QTL mapping notebook.
