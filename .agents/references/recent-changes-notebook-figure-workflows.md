@@ -1,5 +1,19 @@
 # Recent Changes - Notebook Figure Workflows
 
+### 2026-09-17 - Restore missing QTL QC plotting sections
+
+- Slice goal: Restore plotting cells accidentally removed during the shared arena-evenness refactor without reverting the expected-arena metric changes.
+- What changed: Restored the complete per-experiment QC plotting cell, the Sel1/Sel3 QC-metric boxplot section, and the SI-correlation section from their authoritative notebook sources; removed temporary duplicate plotting helpers and cleared restored/downstream plot outputs.
+- Rerun implications: Rerun Sections 7-11 to regenerate the figures; trajectory loading, expected-arena evenness, and QC calculations do not need to be repeated when their in-memory tables are current.
+- Validation performed: Parsed all 27 notebook cells, matched the restored Section 7-9 sources to their committed versions, compiled all 14 code cells, rendered Sections 7-11 with synthetic data for all five QC metrics, and passed all six arena-helper unit tests with `unittest`.
+
+### 2026-09-17 - Shared expected-arena evenness helper
+
+- Slice goal: Give the trajectory-grid and QTL QC notebooks one complete arena-use evenness implementation without fish-specific occupancy radii.
+- What changed: Added `functions/arena_use.py` to build the fixed expected-arena grid, occupancy seconds, probability maps, normalized Shannon evenness, and coverage diagnostics directly from centered trajectories. Both notebooks now call the helper; the trajectory heatmap consumes its occupancy output, and personal-radius settings, flags, columns, and plotting code were removed.
+- Rerun implications: Rerun both notebooks from their trajectory-loading sections. QTL `spaceEvenness`, derived zMAD thresholds, and flagged fish will change because all fish now use the full expected-arena denominator and a fixed-diameter grid.
+- Validation performed: Added unit tests for entropy endpoints, fixed-grid/full-arena normalization, out-of-arena exclusion, sample-time invariance, empty data, and input validation. Both notebooks parse as JSON and their rewritten sources were inspected; Python execution remains pending because no accessible interpreter was available in this session.
+
 ### 2026-09-16 - Explain per-fish arena-use evenness
 
 - Slice goal: Make the evenness calculation in `ShoalingTrajectoryGrid_2026.ipynb` readable without changing its behavior.
