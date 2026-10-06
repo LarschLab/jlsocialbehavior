@@ -1,5 +1,48 @@
 # Recent Changes - Notebook Figure Workflows
 
+### 2026-10-02 - QTL QC missing animal-size review markers
+
+- Slice goal: Include fish with missing animal size in the final QTL QC figure and line summary without treating missingness as an outlier.
+- What changed: `QTLQualityControl.ipynb` now marks complete-SI fish with missing animal size using a distinct X overlay, reports per-experiment missing-size counts, and adds `Animal size missing` plus `Unique flagged fish (outlier or size missing)` columns to the line summary; the latter counts overlapping flags once.
+- Rerun implications: No data-pipeline rerun is required; rerun Sections 11 and 12 after `qc_table` is available.
+- Validation performed: Parsed notebook JSON, syntax-checked all 15 code cells, and smoke-tested ordinary, animal-size-outlier, missing-size-only, and overlapping-flag rows; verified the marker, per-experiment count, line count, all-lines total, unchanged outlier total, and the non-double-counting flagged-fish union.
+
+### 2026-09-27 - DeltaSI panels in selection/QTL metric comparisons
+
+- Slice goal: Add bout-minus-linear DeltaSI to the final Sel1 and Sel3 comparison figures without changing the existing panels' samples.
+- What changed: `ShoalingQTLMappingAnalysis_2026.ipynb` now pairs episode summaries by dataset-qualified fish identity, fills the sixth panel with DeltaSI, draws a zero reference, and warns separately when eligible Sel1 or Sel3 fish lack a valid pair.
+- Rerun implications: No pipeline rerun is required; rerun the combined-data and final comparison cells against the existing episode summaries.
+- Validation performed: Parsed and compiled the notebook and smoke-tested paired and missing-episode behavior plus both six-panel figures with synthetic data.
+
+### 2026-09-27 - QTL QC outlier summary by line
+
+- Slice goal: Summarize the final QTL QC outlier counts by metric category and selection line.
+- What changed: `QTLQualityControl.ipynb` now ends with a line-by-category table containing unique outlier-fish counts, all five metric-specific counts, and an all-lines total row.
+- Rerun implications: No data-pipeline rerun is required; rerun the final summary cell after `qc_table` is available.
+- Validation performed: Parsed and compiled the notebook, then exercised the aggregation with overlapping flags, multiple lines, and a zero-outlier line in synthetic data.
+
+### 2026-09-24 - External QTL QC correlation legends
+
+- Slice goal: Keep correlation legends from covering data or statistics in the pooled and Sel1/Sel3 QC figures.
+- What changed: Every correlation panel now places its two-entry legend in one centered row below the x-axis title; both grids are taller and use additional vertical spacing to accommodate the external legends.
+- Rerun implications: No data-pipeline rerun is required; rerun the correlation plotting cell after `qc_table` is available to refresh both figures.
+- Validation performed: Parsed and compiled the notebook, rendered both grids, measured every legend below its x-axis label and outside its axes, checked row and figure-boundary clearance, and confirmed shared family x-limits, annotations, and output stems.
+
+### 2026-09-24 - QTL QC family correlation axis alignment
+
+- Slice goal: Make each Sel1/Sel3 QC-correlation pair directly comparable and keep Space-use evenness legends clear of the statistics annotations.
+- What changed: `QTLQualityControl.ipynb` now shares x-axis limits within each family-grid metric row and places Space-use evenness legends in the upper-right in both pooled and family-specific correlation figures.
+- Recovery note: A concurrent notebook save corrupted embedded outputs in the adjacent line/date and correlation cells during editing; the stale outputs were cleared, the affected line/date helper header was restored, and all five recovered metric plots were smoke-rendered.
+- Rerun implications: No data-pipeline rerun is required; rerun Section 9 after `qc_table` is available to refresh both correlation figures.
+- Validation performed: Parsed and compiled the notebook, smoke-rendered both correlation figures, verified matching family-panel x-limits per metric, independent ranges across metrics, upper-right Space-use legends, and unchanged annotations and output stems.
+
+### 2026-09-23 - QTL QC SI correlations by selection family
+
+- Slice goal: Compare QC-metric relationships with individual shoaling index independently for Sel1 and Sel3 fish.
+- What changed: `QTLQualityControl.ipynb` retains its pooled correlation figure and adds a five-row, two-column Sel1/Sel3 grid with family-specific Pearson correlations, p-values, regression lines, complete-case counts, and metric-outlier overlays.
+- Rerun implications: No data-pipeline rerun is required; rerun Section 9 after `qc_table` is available to refresh both correlation figures and save `qtl_qc_si_correlations_by_selection_family` as PNG and PDF.
+- Validation performed: Parsed and compiled the notebook and smoke-rendered pooled and family-specific figures with synthetic Sel1/TLSel1/Sel3/TLSel3 data, including missing, outlier, insufficient-sample, and constant-variable cases.
+
 ### 2026-09-17 - Restore missing QTL QC plotting sections
 
 - Slice goal: Restore plotting cells accidentally removed during the shared arena-evenness refactor without reverting the expected-arena metric changes.
@@ -664,6 +707,54 @@ Append meaningful completed changes here.
 - What changed: Removed condition-specific processing tables and downstream duplicated summary loading while preserving the existing 2h vs 4h/all plotting interface.
 - Rerun implications: Full summaries may need one rerun in the `4h_all` processing folder; the 2h window is now an in-memory subset and does not need its own processing output.
 - Validation performed: Parsed the edited notebook as JSON, searched for stale condition-loop references, and compiled all 10 transformed notebook code cells with the `jlsocial` Python environment.
+
+### 2026-09-23 - QTL selection-family plot panels
+
+- Slice goal: Separate the F2 cohort plot into directly comparable Sel1 and Sel3 panels.
+- Passes completed: Reworked the targeted `ShoalingQTLMappingAnalysis_2026.ipynb` plotting cell into a shared-y two-panel figure.
+- What changed: Each panel now orders cohorts by line and date, colors individual lines within family palettes, shows cohort mean +/- SD, annotates F2 counts, and overlays an equally cohort-weighted family mean; one combined line legend and both family-mean values appear at the right.
+- Rerun implications: No pipeline rerun required; rerun the edited notebook cell to refresh `shoalindex_hivslo.pdf` and its displayed output.
+- Validation performed: Parsed the notebook JSON, compiled the edited cell, and rendered representative synthetic Sel1/Sel3 data to verify two axes with identical `[-0.1, 0.6]` limits and the intended legend and average overlays.
+
+### 2026-09-23 - Delta SI selection-family plot panels
+
+- Slice goal: Add a separate F2 Delta SI comparison for Sel1 and Sel3 without replacing the existing Delta SI plot.
+- Passes completed: Added a heading and a new shared-y two-panel plotting cell immediately after the original Delta SI cell in `ShoalingQTLMappingAnalysis_2026.ipynb`.
+- What changed: The new figure orders cohorts by line and date, colors individual lines by family palette, shows cohort mean +/- SD and F2 counts, overlays equally cohort-weighted family means, and saves `shoalindelta_sel1_sel3.pdf`; the original plot and `shoalindelta_hivslo.pdf` remain unchanged.
+- Rerun implications: No pipeline rerun required; run the existing Delta SI cell to create `delta_data`, then run the new panel cell.
+- Validation performed: Parsed and compiled the new cell, confirmed adjacency and distinct output filenames, and rendered representative data with matching `[-0.15, 0.35]` y-limits.
+
+### 2026-09-23 - Line- and date-ordered QTL QC plots
+
+- Slice goal: Add line-grouped, chronological variants of every section 7 QC metric plot without changing the originals.
+- Passes completed: Added a new subsection and five-figure generation block to `Analyses/QTLmapping/QTLQualityControl.ipynb` before section 8, then split each added figure into shared-y Sel1 and Sel3 panels.
+- What changed: New figures sort experiments case-insensitively by line and then date, use the QTL mapping notebook's custom line colors, retain deterministic jitter and mean +/- SD, show metric outliers as hollow colored rings, and restrict zMAD lines to the matching family panel; outputs use `qtl_qc_<metric>_by_line_and_date` stems.
+- Rerun implications: No data-pipeline rerun required; rerun through section 7 to populate `qc_table` and `qc_reference`, then run the added cell.
+- Validation performed: Parsed the notebook, checked unique cell IDs and distinct output stems, compiled the added cell, rendered all five metrics from synthetic experiments, and visually inspected the custom palette, shared axes, outlier rings, and family-specific thresholds.
+
+### 2026-09-25 - QTL post-loom family median panels
+
+- Slice goal: Add a robust Sel1/Sel3 comparison for fish-level post-loom maximum velocity without replacing the existing mean +/- SD plot.
+- Passes completed: Added a heading and shared-y two-panel cell immediately after the section 4 plot in `Analyses/QTLmapping/LoomAnalysis_QTL.ipynb`.
+- What changed: The new F2 view pools setup recordings by line set, orders line sets by line and date, uses the custom QTL line colors, summarizes fish with the median +/- normal-scaled MAD, annotates counts, and overlays the median of line-set medians for each family.
+- Rerun implications: No cache or extraction rerun required when `experiment_fish_max_velocity` is already available; run the existing section 4 cell before the new panel cell.
+- Validation performed: Parsed and compiled the notebook cell, preserved the original mean/SD cell and outputs, and rendered representative data to verify F2 filtering, setup pooling, order, custom colors, shared axes, MAD intervals, counts, and family medians.
+
+### 2026-09-25 - Unsided loom response family grid
+
+- Slice goal: Add a robust Sel1/Sel3 comparison for the first two unsided `CLsemi030` response metrics without replacing their existing plots.
+- Passes completed: Added a heading and a 2-by-2 family grid immediately after the original Section 5 response figure in `Analyses/QTLmapping/LoomAnalysis_QTL.ipynb`.
+- What changed: The F2-only grid orders line sets by line and date, uses the custom QTL line colors, summarizes fish with the median +/- normal-scaled MAD, annotates metric-specific counts, and overlays the median of line-set medians for each family and response metric.
+- Rerun implications: No cache or extraction rerun is required; run through the Section 4 family-median cell to define the shared metadata, palettes, and MAD helper, then run the original Section 5 response cell before the new grid.
+- Validation performed: Parsed and compiled the notebook, verified unique cell IDs and cell placement, preserved the original response cell, and smoke-rendered representative Sel1/Sel3 data to verify row-shared axes, ordering, colors, robust summaries, counts, family medians, and the external legend.
+
+### 2026-09-27 - Unsided loom velocity family grid
+
+- Slice goal: Compare post-loom maximum velocity and valid post/pre velocity ratios between Sel1 and Sel3 without replacing the existing Section 5 figures.
+- Passes completed: Added a heading and 2-by-2 family grid after the existing unsided pre/post analysis in `Analyses/QTLmapping/LoomAnalysis_QTL.ipynb`.
+- What changed: The F2-only grid orders line sets by line and date, uses custom QTL line colors, shows median +/- normal-scaled MAD, annotates metric-specific counts, and overlays equally line-set-weighted family medians for both velocity metrics.
+- Rerun implications: No cache rebuild is required when the Section 5 source tables already exist; run the existing unsided maximum-velocity and pre/post cells before the new grid.
+- Validation performed: Parsed and compiled the notebook, checked unique cell IDs and placement, preserved existing plotting cells, and smoke-rendered representative data to verify row-shared axes, ordering, filtering, colors, counts, robust summaries, family medians, and the external legend.
 
 ## Template
 
