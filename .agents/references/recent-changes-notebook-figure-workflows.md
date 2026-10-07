@@ -1,5 +1,12 @@
 # Recent Changes - Notebook Figure Workflows
 
+### 2026-10-06 - Sampled-frame arena-use occupancy
+
+- Slice goal: Express arena occupancy as retained frame counts without estimating elapsed time in the evenness helper.
+- What changed: `functions/arena_use.py` now returns `occupancy_frame_counts` and `total_binned_frame_count` from its three-argument API. The trajectory-grid notebook uses frame-count heatmap labels and exports `total_binned_frame_count` in place of `total_reachable_seconds`; QTL QC calls the same helper without a sampling interval. Movement speed and duration metrics remain time based.
+- Rerun implications: Rerun the trajectory-grid analysis cells to refresh embedded outputs and saved figures/CSVs. QTL evenness values are unchanged for the same selected frames, so raw processing need not be rerun.
+- Validation performed: All six arena-helper tests passed; both notebooks parsed and their code cells compiled. A synthetic 35-fish run confirmed frame-count totals, the renamed metrics column, heatmap title and colorbar labels, and agreement with the QTL evenness caller.
+
 ### 2026-10-02 - QTL QC missing animal-size review markers
 
 - Slice goal: Include fish with missing animal size in the final QTL QC figure and line summary without treating missingness as an outlier.

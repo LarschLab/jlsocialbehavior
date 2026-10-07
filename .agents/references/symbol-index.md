@@ -26,7 +26,7 @@ Use this file when choosing the narrowest code owner before editing.
 
 ## Functions
 
-- `functions.arena_use.calculate_arena_use_evenness`: fixed expected-arena occupancy grids, probability distributions, normalized Shannon evenness, and coverage diagnostics from centered trajectories.
+- `functions.arena_use.calculate_arena_use_evenness`: fixed expected-arena sampled-frame count grids, probability distributions, normalized Shannon evenness, and coverage diagnostics from centered trajectories; takes coordinates, arena radius, and bin count.
 - `functions.notebookHelper.readExperiment`: notebook-facing experiment loading helper.
 - `functions.notebookHelper.savedCsvToDf`: aggregation of saved summary CSVs.
 - `functions.notebookHelper.computeExpTimeOfDay`, `cohend`, `groupCohen`, `groupPower`: notebook statistics/time helpers.
