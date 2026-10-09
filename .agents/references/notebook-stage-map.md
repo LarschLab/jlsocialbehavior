@@ -12,12 +12,13 @@ Use this file for tasks involving `Analyses/*.ipynb`, `DeprecatedAnalyses/Larsch
    - Purpose: load analysis outputs, run panel-specific statistics/plots, compose final figures.
 
 2. Current example analyses
-   - Entries: `Analyses/ShoalingSelectionAnalysis_2025_slim_clean.ipynb`, `Analyses/ShoalingSelectionAnalysis_2025History.ipynb`, `Analyses/ShoalingSelection_2h_vs_4h_2026.ipynb`, `Analyses/ShoalingNeighborhoodMaps_2026.ipynb`, `Analyses/ShoalingTrajectoryGrid_2026.ipynb`, `Analyses/ShoalingCarryoverRawASD_2026.ipynb`, `Analyses/QTLmapping/ShoalingQTLMappingAnalysis_2026.ipynb`, `Analyses/QTLmapping/QTLQualityControl.ipynb`, `Analyses/LoomingAnimalResponseAnalysis.ipynb`, `Analyses/LoomAnalysisCR.ipynb`, `Analyses/LoomAnalysis_QTL.ipynb`, and `Analyses/size_data_analysis.ipynb`.
+   - Entries: `Analyses/ShoalingSelectionAnalysis_2025_slim_clean.ipynb`, `Analyses/ShoalingSelectionAnalysis_2025History.ipynb`, `Analyses/ShoalingSelection_2h_vs_4h_2026.ipynb`, `Analyses/ShoalingNeighborhoodMaps_2026.ipynb`, `Analyses/Dish-useAnalysis.ipynb`, `Analyses/ShoalingCarryoverRawASD_2026.ipynb`, `Analyses/QTLmapping/ShoalingQTLMappingAnalysis_2026.ipynb`, `Analyses/QTLmapping/QTLQualityControl.ipynb`, `Analyses/LoomingAnimalResponseAnalysis.ipynb`, `Analyses/LoomAnalysisCR.ipynb`, `Analyses/LoomAnalysis_QTL.ipynb`, and `Analyses/size_data_analysis.ipynb`.
    - Purpose: selection-shoaling analysis, current data exploration, neighborhood-map summaries, raw ASD/carryover checks, QTL mapping and quality control, cFos examples, loom-response analysis, and size summaries.
 
 3. Helper-backed notebook work
-   - Owners: `functions/notebookHelper.py`, `functions/carryover_effects.py`, `functions/joh_loom_helpers.py`, `functions/plotFunctions_joh.py`, `functions/paperFigureProps.py`, `functions/vector_field_analysis.py`.
+   - Owners: `functions/notebookHelper.py`, `functions/dish_use.py`, `functions/carryover_effects.py`, `functions/joh_loom_helpers.py`, `functions/plotFunctions_joh.py`, `functions/paperFigureProps.py`, `functions/vector_field_analysis.py`.
    - Use helpers for repeated loading, statistics, vector fields, and plotting idioms.
+   - Dish-use analysis: `Analyses/Dish-useAnalysis.ipynb` and QTL QC use `functions.dish_use.analyze_dish_use` for sampled-frame occupancy and evenness. `grid_side_length` is cells per axis; `dish_bin_count` and `visited_bin_count` count eligible and visited bins. The dish notebook requires ROI geometry for raw loading and reads current or legacy radius fields on cache hits; QTL retains its separate trajectory-loader and cache conventions.
 
 4. Looming animal-response analysis
    - Entries: `Analyses/LoomingAnimalResponseAnalysis.ipynb` for one recording and `Analyses/LoomAnalysisCR.ipynb`/`Analyses/LoomAnalysis_QTL.ipynb` for metadata-selected multi-experiment cohorts.
