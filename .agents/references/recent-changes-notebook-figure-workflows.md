@@ -1,5 +1,30 @@
 # Recent Changes - Notebook Figure Workflows
 
+### 2026-10-12 - Correct QTL QC explanations and comments
+
+- What changed: Updated QTL QC Markdown, comments, and docstrings to match current window selection/sampling, summary aggregation and provenance, cache-or-ROI loading, threshold modes and zero-MAD handling, coverage/missingness, robust family plots, SI correlations, overlays, and experiment-animal counts. Executable code, settings, plot labels, schemas, cell IDs, metadata, execution counts, and saved outputs are preserved.
+- Rerun implications: Documentation-only change; no analysis rerun is required. Existing local edits and historical log entries are preserved; NAS data, caches, and exports were not accessed or rewritten.
+- Validation performed: Parsed notebook JSON, compiled all 14 code cells with the repository's jlsocial interpreter, and confirmed before/after AST equality after removing docstrings. Checked unchanged notebook/cell metadata and saved outputs, unique IDs for all 27 cells, source-only byte replacements, and preserved log contents. No analysis cells were executed.
+
+### 2026-10-09 - Simplify QTL diameter naming and show full plot ranges
+
+- What changed: QTL QC now reads only `dishDiameter_mm` (70-mm default) and uses `dish_diameter_mm` locally and in its cache key. The renamed hashed key produces fresh cache filenames for a one-time ROI rebuild; old files are left untouched and are not searched as a fallback. Cache array fields and existing collector handling are preserved. QC metric axes now default to automatic ranges; `FINAL_SI_Y_LIMITS = None` replaces the fixed SI range, with settings validation and hidden-point/review-flag counts for manual metric, family-panel, and SI ranges. Updated explanations and cleared affected outputs/counts. No helper module, alias resolver, or legacy-cache checker was added; completeness and QC-flag calculations are unchanged.
+- Rerun implications: Rerun from Settings. Section 4 requires ROI files on the first rerun to create the new matching caches; subsequent runs can reuse them without ROI. Explicit physical diameters in processing rows must use `dishDiameter_mm`. NAS caches, exports, and processing tables were not modified during this change.
+- Validation performed: All 15 code cells compiled. In-memory checks confirmed the common diameter field/default, unchanged equivalent ROI scaling/centering, changed cache digest with other inputs preserved, old-cache preservation, new-cache creation with the existing schema, subsequent cache reuse without ROI, and missing-ROI collector errors retaining fish. Rendered all five metrics in both plotting layouts plus the final SI view; verified automatic bounds contain finite points, intervals, and displayed cutoffs, and manual bounds/counts handle endpoints and each family correctly. Visually inspected six representative automatic/manual previews under repository `temp/`; plotting emitted no warnings. Confirmed preserved point-5 sources, notebook metadata, unrelated cells, and unchanged dish-use notebook/helper. NAS/real-recording execution was not performed.
+
+### 2026-10-09 - Align QTL QC dish grid with dish-use analysis
+
+- What changed: Renamed QTL QC `SPACE_EVENNESS_BINS` to `DISH_GRID_SIDE_LENGTH` and set it to 40 cells per axis, matching `Analyses/Dish-useAnalysis.ipynb`; updated settings validation and the helper call, and cleared edited-cell outputs/execution counts. Other settings, trajectory-cache keys/schema, and metric columns are preserved.
+- Rerun implications: Rerun Settings and validation, then Section 4 onward to recompute evenness and dependent QC references/flags at 40x40 resolution. Existing trajectory caches remain usable; external exports were not rewritten.
+- Validation performed: Parsed the notebook, compiled all 15 code cells, confirmed matching settings and no old-name source references, and checked QTL caller agreement with the shared helper on a synthetic uniform 1,264-bin circular grid. Verified unchanged output columns, unrelated cells, and notebook metadata. NAS/recording execution was not performed.
+
+### 2026-10-09 - Require cache or ROI for QTL QC trajectories
+
+- Slice goal: Remove background-scale and `pxPmm` fallbacks from `Analyses/QTLmapping/QTLQualityControl.ipynb` while preserving matching trajectory caches.
+- What changed: Raw trajectory loading now requires a regular `ROIdef*` file beside the trajectory, choosing the first sorted match; missing geometry raises an error identifying the directory and trajectory. ROI parsing, centering, scale conversion, cache-first loading, keys/schema, and collector missing-data handling are preserved. Section 4 documents cache-or-ROI loading and the shared dish-use helper; loader/downstream outputs and execution counts are cleared.
+- Rerun implications: Rerun from Section 4 with upstream summary tables available, or restart and rerun from Settings. Existing matching caches remain eligible without ROI files and regardless of their original scale source; rebuilding raw trajectories requires an ROI. No external caches or exports were rewritten.
+- Validation performed: Parsed the notebook and compiled all 15 code cells. In-memory fixtures covered cache hits without ROI, missing-ROI failures with cache absent/disabled despite alternate scale sources, whitespace/comma ROI parsing, directory exclusion, sorted file selection, original centering/scaling and sampled segments, fish-count validation, unchanged cache filename/key/writer fields, and downstream evenness agreement. Collector fixtures retained all 35 fish with warning/error details and verified QC missingness/review flags. Compared against the pre-edit working notebook to confirm preserved unrelated sources, metadata, cache logic, and existing local edits. NAS execution and real recording/export writes were not performed.
+
 ### 2026-10-08 - Correct grid naming and migrate dish-use callers
 
 - Slice goal: Distinguish grid side length in cells from bin counts and make the dish-use notebook, QTL caller, tests, and documentation coherent.
