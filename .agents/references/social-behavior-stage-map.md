@@ -40,14 +40,14 @@ Use this file for questions about stage order, writer ownership, reruns, or down
 
 ## Current selection-shoaling pipeline memory
 
-- Primary current notebook: `Analyses/ShoalingSelectionAnalysis_2025_slim_clean.ipynb`.
+- Primary current notebook: `Analyses/Selection/ShoalingSelectionAnalysis_2025_slim_clean.ipynb`.
 - The active selection/QTL notebooks describe recordings as experiments containing 35 focal animal slots; each focal animal has trajectory columns used independently, then the notebook remaps local slot indices to metadata animal IDs.
 - Visual stimulus blocks are handled as 5 minute episodes in the active notebooks (`epiDur = 5`, `episodes = 24`, `readLim = 24 * 5 * 60 * 30 + 11`).
 - Metadata come from Excel sheets `AllExp` and `AllAn`. Notebook cells build `processingSettings.csv` with raw trajectory paths, pair-list paths, birth dates, arena settings, processing flags, and output folders.
 - `models.experiment_set.experiment_set(csvFile=..., MissingOnly=True)` reuses existing matching `*_siSummary*.csv` files and only instantiates `models.experiment.experiment` for missing summaries.
 - `models.experiment.experiment` loads trajectories, computes ROI-derived pixel scaling, optionally recomputes animal size, creates one `Pair` per animal-partner episode, and writes `*_siSummary_epi<episodeDur>.csv`.
 - The notebook reloads those summary CSVs from `ProcessingDir`, offsets local `animalIndex` by `i * 35`, maps through `anIDsAll`, merges genotype/line/date/setup metadata, filters to `80 < inDishTime < 240`, and averages numeric columns into `dfEpiAn`.
-- `dfEpiAn_selection.csv` is written by the slim selection notebook and is consumed by `Analyses/ShoalingQTLMappingAnalysis_2026.ipynb`.
+- `dfEpiAn_selection.csv` is written by the slim selection notebook and is consumed by `Analyses/QTLmapping/ShoalingQTLMappingAnalysis_2026.ipynb`.
 
 ## Navigation notes
 

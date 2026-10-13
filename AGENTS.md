@@ -21,7 +21,7 @@ This repository uses a routed instruction system under `.agents/`. Start with th
 - Keep notebooks and wrappers orchestration-thin; do not make them new sources of business logic.
 - Preserve canonical output names, schemas, stage order, and legacy variable names unless a deliberate migration requires changing them.
 - Fix data semantics at the writer stage, not by compensating in downstream consumers.
-- Do not treat `playground/`, `obsolete/`, or embedded environment directories as authoritative unless the user directly targets them.
+- Do not treat `legacy/` or embedded environment directories as authoritative unless the user directly targets them.
 - Validate after edits with the smallest relevant smoke, contract, rerun, or artifact check.
 - For new analysis notebooks or helpers, add a compact entry to the relevant `.agents/references/recent-changes-*.md` log and update routing docs only when a future agent would need the new entrypoint.
 
@@ -33,6 +33,7 @@ This repository uses a routed instruction system under `.agents/`. Start with th
 - `.agents/references/refactor-rules.md`: repo-specific ownership and edit-scope policy.
 - `.agents/references/refactor-loop-policy.md`: how to continue or stop within an ownership slice.
 - `.agents/references/current-state.md`: migration state, legacy areas, and practical caveats.
+- `.agents/references/repository-layout.md`: active entrypoints, archive locations, and restoration policy.
 - `.agents/references/recent-changes.md`: index for workflow-specific change logs.
 - `.agents/references/remaining-work.md`: index for unresolved workflow work.
 

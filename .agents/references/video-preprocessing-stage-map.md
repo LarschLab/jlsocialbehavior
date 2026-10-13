@@ -4,10 +4,12 @@ Purpose: navigate video, ROI, scale, size, and GUI preprocessing work.
 
 Use this file for tasks involving videos, ffmpeg, ROI definitions, background/median videos, animal size extraction, or GUI wrappers.
 
+Shared `functions/` helpers remain in the active dependency tree. Standalone entrypoints and shape modules below are historical workflows under `legacy/`.
+
 ## End-to-end stages
 
 1. Video and trajectory discovery
-   - Owners: top-level wrappers, GUI scripts, `models/experiment.py`.
+   - Owners: archived standalone wrappers and GUI scripts, plus active `models/experiment.py`.
    - Inputs: `.avi`, trajectory `.txt`/CSV/`.npy`, ROI files, pair lists.
 
 2. ROI, background, and scale
@@ -15,15 +17,15 @@ Use this file for tasks involving videos, ffmpeg, ROI definitions, background/me
    - Outputs: ROI definition files, background/median files, scale metadata used for `pxPmm`.
 
 3. Video splitting and preprocessing
-   - Owners: `ffmpegSplit4_module_bgDiv.py`, `processingVideo.py`, `rotationWrapper.py`, `scripts/tiffProcessing.py`.
+   - Owners: `legacy/root-scripts/ffmpegSplit4_module_bgDiv.py`, `legacy/root-scripts/processingVideo.py`, `legacy/root-scripts/rotationWrapper.py`, `legacy/scripts/tiffProcessing.py`.
    - Output semantics depend on wrapper parameters and external ffmpeg availability.
 
 4. Animal size and shape extraction
-   - Owners: `functions/getAnimalSizeFromVideo.py`, `functions/video_functions.py`, `models/AnimalShapeParameters.py`, `models/AnimalShapeParameters_MP.py`.
+   - Owners: `functions/getAnimalSizeFromVideo.py`, `functions/video_functions.py`, `legacy/models/AnimalShapeParameters.py`, `legacy/models/AnimalShapeParameters_MP.py`.
    - Outputs: `*_anSize.csv`, shape-parameter `.npz`/video artifacts where requested.
 
 5. GUI orchestration
-   - Owners: `vidGui.py`, `VidGui2ArenaShoal.py`, `functions/gui_circle.py`.
+   - Owners: `legacy/root-scripts/vidGui.py`, `legacy/root-scripts/VidGui2ArenaShoal.py`, `functions/gui_circle.py`.
    - GUIs own user interaction and parameter collection, not reusable processing semantics.
 
 ## Validation notes

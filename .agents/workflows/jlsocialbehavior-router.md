@@ -13,8 +13,9 @@ Always read `coding.md` before this router. Then choose one workflow profile bel
 | Primary target or query content | Open first |
 | --- | --- |
 | Shoaling index, inter-animal distance, pair/animal episode semantics, summaries, maps, bouts, leadership, sync, experiment metadata | `.agents/workflows/social-behavior-analysis-router.md` |
-| `Analyses/*.ipynb`, `DeprecatedAnalyses/LarschAndBaier2018/*.ipynb`, figure panels, composite reports, notebook plotting, QTL/cFos/selection notebook analysis | `.agents/workflows/notebook-figure-workflows-router.md` |
+| `Analyses/*.ipynb`, `legacy/DeprecatedAnalyses/LarschAndBaier2018/*.ipynb`, figure panels, composite reports, notebook plotting, QTL/cFos/selection notebook analysis | `.agents/workflows/notebook-figure-workflows-router.md` |
 | Video splitting, ffmpeg wrappers, ROI/background/scale detection, animal size extraction, GUI scripts, shape parameters, preprocessing scripts | `.agents/workflows/video-preprocessing-gui-router.md` |
+| Active/legacy classification, repository layout, restoring archived workflows | `.agents/references/repository-layout.md` |
 | Generic refactor, ownership question, code movement, public symbol changes | `.agents/references/refactor-rules.md`, then the matching profile router |
 | Canonical output filename/schema/cache/rerun confusion | `.agents/references/canonical-outputs.md`, then the writer workflow router |
 | Active migration, legacy code, or unclear authority | `.agents/references/current-state.md`, then the matching profile router |

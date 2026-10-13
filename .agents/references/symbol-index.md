@@ -6,9 +6,9 @@ Use this file when choosing the narrowest code owner before editing.
 
 ## Trusted implementation patterns
 
-- `models/` owns experiment, animal, pair, time-series, and shape-analysis semantics.
-- `functions/` owns reusable helpers for notebooks, plotting, image/video processing, statistics, and vector fields.
-- Top-level scripts and GUIs own orchestration, command construction, and user interaction.
+- `models/` owns active experiment, animal, pair, time-series, and geometry semantics. Archived shape/bout models live in `legacy/models/`.
+- `functions/` owns active notebook, plotting, image/video, and statistics helpers. Archive-only helpers live in `legacy/functions/`.
+- Archived standalone scripts and GUIs own historical orchestration, command construction, and user interaction.
 - Notebooks own parameter setup, stage order, and display/composition only.
 
 ## Models
@@ -19,10 +19,7 @@ Use this file when choosing the narrowest code owner before editing.
 - `models.pair.Pair`: pair-level behavior such as inter-animal distance, shifted controls, and shoaling index.
 - `models.animal.Animal`: animal-level wrapper around trajectories and derived time series.
 - `models.AnimalTimeSeriesCollection.AnimalTimeSeriesCollection`: position, speed, curvature, thigmotaxis, neighborhood maps, force maps.
-- `models.AnimalBoutSeriesCollection.AnimalBoutSeriesCollection`: bout-series semantics.
 - `models.geometry`: `Trajectory`, `Circle`, `Region`, `Vector`, angle and distance geometry helpers.
-- `models.AnimalShapeParameters.get_AnimalShapeParameters`: shape/tail/body extraction entrypoint.
-- `models.AnimalShapeParameters_MP.get_AnimalShapeParameters`: multiprocessing variant of shape extraction.
 
 ## Functions
 
@@ -30,7 +27,6 @@ Use this file when choosing the narrowest code owner before editing.
 - `functions.notebookHelper.readExperiment`: notebook-facing experiment loading helper.
 - `functions.notebookHelper.savedCsvToDf`: aggregation of saved summary CSVs.
 - `functions.notebookHelper.computeExpTimeOfDay`, `cohend`, `groupCohen`, `groupPower`: notebook statistics/time helpers.
-- `functions.carryover_effects`: raw animal-stimulus distance extraction, 1-minute shifted-control shoaling index, and plotting helpers for `Analyses/ShoalingCarryoverRawASD_2026.ipynb`.
 - `functions.joh_loom_helpers.load_animal_file`, `embedded_stimulus_from_animal_file`, `stimulus_blocks`, `loom_trials`, `unsided_loom_trials`: raw animal-file loading, L/R-labelled loom-block parsing, and pulse-level parsing of unsided `CLsemi###` blocks.
 - `functions.joh_loom_helpers.extract_loom_snippets`, `extract_legacy_loom_snippets`, `legacy_loom_response_metrics`: loom-window extraction, legacy coordinate alignment, and raw baseline/response escape metrics.
 - `functions.joh_loom_helpers.select_loom_experiments`: metadata-driven selection of raw shoaling loom experiments using date mode, line, genotype, lineSet, and folder filters.
@@ -47,15 +43,27 @@ Use this file when choosing the narrowest code owner before editing.
 - `functions.ImageProcessor`: reusable image segmentation, contour, skeleton, morphology, and crop helpers.
 - `functions.plotFunctions_joh`: reusable plot helpers for maps and group comparisons.
 - `functions.paperFigureProps.paper`: global paper-style plotting defaults.
-- `functions.vector_field_analysis.VectorFieldAnalysis`: vector-field analysis orchestration.
-- `functions.vector_field_analysis.calc_*`, `plot_*`: vector-field statistics and plots.
 - `functions.matrixUtilities_joh`: geometry/path/math utility helpers used across modules.
 
-## Scripts and wrappers
+## Repository maintenance
 
-- `main.py`: simple batch/single-experiment entrypoint.
-- `reRunSizeAnalysis.py`: size rerun wrapper.
-- `ffmpegSplit4_module_bgDiv.py`: ffmpeg split/background-division wrapper.
-- `processingVideo.py`, `rotationWrapper.py`: video preprocessing orchestration.
-- `vidGui.py`, `VidGui2ArenaShoal.py`: GUI entrypoints.
-- `scripts/pairLists.py`, `scripts/calibration.py`, `scripts/splitMultiPairTxt.py`: operational helper scripts.
+- `scripts/sync_coding_doc.py`: regenerates `coding.md` from `setupAgents.md`.
+
+## Archived helpers and models
+
+- `legacy.models.AnimalBoutSeriesCollection.AnimalBoutSeriesCollection`: bout-series semantics.
+- `legacy.models.AnimalShapeParameters.get_AnimalShapeParameters`: shape/tail/body extraction entrypoint.
+- `legacy.models.AnimalShapeParameters_MP.get_AnimalShapeParameters`: multiprocessing variant of shape extraction.
+- `legacy.functions.carryover_effects`: raw animal-stimulus distance extraction, 1-minute shifted-control shoaling index, and plotting helpers for `legacy/Analyses/others/ShoalingCarryoverRawASD_2026.ipynb`.
+- `legacy.functions.vector_field_analysis.VectorFieldAnalysis`: vector-field analysis orchestration.
+- `legacy.functions.vector_field_analysis.calc_*`, `plot_*`: vector-field statistics and plots.
+- `legacy.functions.si_slowdown.estimate_si_slowdown`: SI slowdown inference for the archived exposure-duration notebook.
+
+## Archived scripts and wrappers
+
+- `legacy/root-scripts/main.py`: simple batch/single-experiment entrypoint.
+- `legacy/root-scripts/reRunSizeAnalysis.py`: size rerun wrapper.
+- `legacy/root-scripts/ffmpegSplit4_module_bgDiv.py`: ffmpeg split/background-division wrapper.
+- `legacy/root-scripts/processingVideo.py`, `legacy/root-scripts/rotationWrapper.py`: video preprocessing orchestration.
+- `legacy/root-scripts/vidGui.py`, `legacy/root-scripts/VidGui2ArenaShoal.py`: GUI entrypoints.
+- `legacy/scripts/pairLists.py`, `legacy/scripts/calibration.py`, `legacy/scripts/splitMultiPairTxt.py`: operational helper scripts.

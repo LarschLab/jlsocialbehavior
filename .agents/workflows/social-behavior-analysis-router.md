@@ -24,9 +24,11 @@ Use this file when a task mentions `models/experiment_set.py`, `models/experimen
 | `*_siSummary_epi*.csv` columns or schema | `canonical-outputs.md` | writer in `models/experiment.py` |
 | `*MapData.npy` shape, shifted maps, neighborhood maps | `canonical-outputs.md` | `models/experiment.py`, `models/AnimalTimeSeriesCollection.py` |
 | Shoaling index or inter-animal distance | `symbol-index.md` | `models/pair.py`, `models/AnimalTimeSeriesCollection.py` |
-| Animal-level speed, thigmotaxis, bouts, sync, leadership | `symbol-index.md` | `models/animal.py`, `models/AnimalBoutSeriesCollection.py`, `models/AnimalTimeSeriesCollection.py` |
+| Animal-level speed, thigmotaxis, bouts, sync, leadership | `symbol-index.md` | `models/animal.py`, `models/pair.py`, `models/AnimalTimeSeriesCollection.py` |
 | Notebook reads saved summaries | `canonical-outputs.md` | writer first, notebook consumer second |
 | Refactor of reusable analysis logic | `refactor-rules.md` | narrowest model/helper owner |
+
+The active bout-duration path uses `models.pair.Pair.medBoutDur` and `models/AnimalTimeSeriesCollection.py`. The separate `legacy/models/AnimalBoutSeriesCollection.py` is archived.
 
 ## Ownership guidance
 

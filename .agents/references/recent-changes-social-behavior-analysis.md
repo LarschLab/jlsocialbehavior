@@ -59,3 +59,9 @@ Append meaningful completed changes here.
 - What changed:
 - Rerun implications:
 - Validation performed:
+
+### 2026-10-12 - Separate active models from archived workflows
+
+- What changed: retained the six active model modules and their complete shared helper dependency tree at existing paths. Moved unused bout-series and shape models to `legacy/models/`; routed the active bout-duration path to `models.pair.Pair.medBoutDur` and `models/AnimalTimeSeriesCollection.py`. Archived consumers import moved shape models and spline helpers through `legacy.*`; shape modules now qualify the shared `models.geometry` import. Writer implementations and canonical outputs are unchanged.
+- Validation performed: all 22 active implementation modules and all seven active notebooks are byte-identical to the baseline inventory; each notebook's local imports passed in an isolated process, and the active dependency closure contains no `legacy` imports. Manifest integrity and 19 active plus three archived tests passed. See the notebook-workflow restructuring entry for the full archive inventory and preserved artifact checks.
+- Rerun implications: active processing and saved summaries require no migration. Historical module-named pickles may need their original environment or regeneration if an archived workflow is restored.

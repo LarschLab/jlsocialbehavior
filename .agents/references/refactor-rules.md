@@ -11,7 +11,7 @@ Use this file before moving code, extracting helpers, or changing public workflo
 - Top-level scripts and GUIs own wrapper behavior, command setup, and interaction only.
 - Writer stages own table schemas, cache names, array shapes, and export semantics.
 - Downstream notebooks and helper consumers should not redefine writer-stage meanings.
-- Legacy folders `obsolete/` and `playground/` are not authority unless directly targeted.
+- `legacy/`, including `legacy/obsolete/` and `legacy/playground/`, is not authority unless directly targeted.
 - Embedded environment folders are dependency artifacts, not project source owners.
 
 ## Editing rules

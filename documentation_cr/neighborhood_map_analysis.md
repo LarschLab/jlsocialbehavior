@@ -1,6 +1,8 @@
 # Neighborhood Map Analysis
 
-This note explains the neighborhood-map analysis path in this repository and how to use `Analyses/ShoalingNeighborhoodMaps_2026.ipynb`.
+This note documents an archived neighborhood-map workflow and how to use `legacy/Analyses/old/ShoalingNeighborhoodMaps_2026.ipynb`.
+
+This notebook is inactive. Use the repository root for shared imports and consult `legacy/README.md` before running it.
 
 ## What A Neighborhood Map Is
 
@@ -60,7 +62,7 @@ The new notebook focuses on map type `0`, the neighbor-density map. It also load
 
 ## Relation To Vector-Field Analysis
 
-The larger `functions/vector_field_analysis.py` workflow combines several related analyses:
+The larger `legacy/functions/vector_field_analysis.py` workflow combines several related analyses:
 
 - neighborhood maps
 - bout-triggered vector fields
@@ -96,7 +98,7 @@ The new notebook does not use this whole legacy vector-field class. It uses the 
 Open:
 
 ```text
-Analyses/ShoalingNeighborhoodMaps_2026.ipynb
+legacy/Analyses/old/ShoalingNeighborhoodMaps_2026.ipynb
 ```
 
 Start in the `Settings` cell.

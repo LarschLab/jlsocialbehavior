@@ -2,7 +2,7 @@
 
 Purpose: route tasks for notebook orchestration, figure generation, paper-style plots, and saved analysis reports.
 
-Use this file when a task targets notebooks in `Analyses/` or `DeprecatedAnalyses/LarschAndBaier2018/`, figure panels, composed reports, QTL/cFos/selection analyses, or notebook-specific plotting.
+Use this file when a task targets notebooks in `Analyses/` or `legacy/DeprecatedAnalyses/LarschAndBaier2018/`, figure panels, composed reports, QTL/cFos/selection analyses, or notebook-specific plotting.
 
 ## Read order
 
@@ -19,12 +19,14 @@ Use this file when a task targets notebooks in `Analyses/` or `DeprecatedAnalyse
 
 | Query content | Read next | Likely owner |
 | --- | --- | --- |
-| Master 2018 figure rerun or paper figure panel | `notebook-stage-map.md` | `DeprecatedAnalyses/LarschAndBaier2018/*.ipynb`, module callers |
+| Master 2018 figure rerun or paper figure panel | `notebook-stage-map.md` | `legacy/DeprecatedAnalyses/LarschAndBaier2018/*.ipynb`, module callers |
 | Notebook data loading from saved summaries | `canonical-outputs.md` | `functions/notebookHelper.py` or writer stage |
 | Plot styling, figure properties, color maps | `symbol-index.md` | `functions/paperFigureProps.py`, `functions/plotFunctions_joh.py` |
-| Vector field plots and derived social maps | `symbol-index.md` | `functions/vector_field_analysis.py` |
+| Vector field plots and derived social maps | `symbol-index.md` | `legacy/functions/vector_field_analysis.py` |
 | QTL, cFos, or selection analysis notebook changes | `notebook-stage-map.md` | `Analyses/*.ipynb` plus helper modules |
 | Notebook refactor | `refactor-rules.md` | extract reusable logic to modules; keep notebook orchestration-thin |
+
+The active set has seven notebooks; consult `repository-layout.md` for exact paths. `legacy/Analyses/old/`, `legacy/Analyses/others/`, and `legacy/DeprecatedAnalyses/` are inactive collections.
 
 ## Ownership guidance
 
