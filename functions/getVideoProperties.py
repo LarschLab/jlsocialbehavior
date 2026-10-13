@@ -15,7 +15,10 @@ def getVideoProperties(aviPath):
     if np.equal(~os.path.isfile(videoPropsFn),-1):
         #read video metadata via ffprobe and parse output
         #can't use openCV because it reports tbr instead of fps (frames per second)
-        cmnd = ['c:/ffmpeg/bin/ffprobe', '-show_format', '-show_streams', '-pretty', '-loglevel', 'quiet', aviPath]
+        cmnd = ['ffprobe', '-show_format', '-show_streams', '-pretty', '-loglevel', 'quiet', aviPath]
+        print('this is a debbuging message to know if i am here. This the getVideoProperties.py script')
+        print(aviPath)
+        print('running command: ' + str(cmnd))
         p = subprocess.Popen(cmnd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         out = str(out)[3:-10]

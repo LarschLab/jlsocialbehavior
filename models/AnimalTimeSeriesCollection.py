@@ -302,22 +302,22 @@ class AnimalTimeSeriesCollection:
     # this map seems flipped both horizontally and vertically! vertical is corrected at plotting.
     def neighborMat(self):
         mapBins = self.animal.pair.experiment.mapBins
-        neighborMat = np.zeros([62, 62])
         pos = self.position_relative_to_neighbor_rot().xy
         pos = pos[~np.isnan(pos).any(axis=1), :]
+        mapSize = mapBins.shape[0] - 1
         neighborMat = np.histogramdd(pos,
                                      bins=[mapBins, mapBins],
-                                     normed=True)[0] * neighborMat.shape[0] ** 2
+                                     density=True)[0] * mapSize ** 2
         return neighborMat
 
     def neighborMat_filt(self, **kwargs):
         mapBins = self.animal.pair.experiment.mapBins
-        neighborMat = np.zeros([62, 62])
         pos = self.position_relative_to_neighbor_rot_alt(**kwargs).xy
         pos = pos[~np.isnan(pos).any(axis=1), :]
+        mapSize = mapBins.shape[0] - 1
         neighborMat = np.histogramdd(pos,
                                      bins=[mapBins, mapBins],
-                                     normed=True)[0] * neighborMat.shape[0] ** 2
+                                     density=True)[0] * mapSize ** 2
         return neighborMat
 
     # -------simple bout analysis------

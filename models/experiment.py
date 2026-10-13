@@ -595,11 +595,11 @@ class experiment(object):
         # produce pandas df where each row is one episode
         # ordering is same as self.pair list
 
-        episodeStartFrame = np.array([x.rng[0] for x in self.pair])
+        episodeStartFrame = np.array([x.rng[0] for x in self.pair], dtype=int)
         animalSet = np.repeat(self.expInfo.animalSet,episodeStartFrame.shape[0])
         inDishTime = (episodeStartFrame / (30 * 60)) + self.expInfo.inDishTime
-        AnimalIndex = np.array([x.animalIDs[0] for x in self.pair])
-        cp = np.array([x.animalIDs[1] for x in self.pair])  # current partner
+        AnimalIndex = np.array([x.animalIDs[0] for x in self.pair], dtype=int)
+        cp = np.array([x.animalIDs[1] for x in self.pair], dtype=int)  # current partner
         episodeName = self.episodeAll[episodeStartFrame]
         epiNr = np.array([x.epiNr for x in self.pair])
         bd = self.expInfo.birthDayAll[AnimalIndex]
@@ -777,7 +777,10 @@ class experiment(object):
                                     nrows=1,
                                     sep=':')
 
-            if firstLine.values[0][0][0] == '(':
+            _fl = str(firstLine.values[0][0])
+            _fl0 = _fl[0] if len(_fl) > 0 else ''
+
+            if _fl0 == '(':
                 rawData = pd.read_csv(self.expInfo.trajectoryPath,
                                       #sep=',|\)|\(',
                                       engine='python',
@@ -793,7 +796,7 @@ class experiment(object):
                 print('old bonsai format detected')
                 # rawData= mat.reshape((mat.shape[0],2,2))
 
-            elif firstLine.values[0][0][0] == 'X':
+            elif _fl0 == 'X':
                 rawData = pd.read_csv(self.expInfo.trajectoryPath,
                                       header=None,
                                       delim_whitespace=True,
