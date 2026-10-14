@@ -61,7 +61,7 @@ def extract_frames_ffmpeg(aviPath, frames, fps=30):
     aviPath : str
         Path to video file
     frames : np.array
-        Array of frame numbers to extract (should be sorted!)
+        Array of frame numbers to extract (sorted and deduplicated internally)
     fps : float
         Frames per second of the video
         
@@ -72,7 +72,7 @@ def extract_frames_ffmpeg(aviPath, frames, fps=30):
     frame_files : list
         List of paths to extracted frame files (ordered)
     valid_frames : np.array
-        Frame numbers that were actually requested from FFmpeg
+        Sorted, unique frame numbers that were actually requested from FFmpeg
     """
     # Create temporary directory for frames
     temp_dir = tempfile.mkdtemp(prefix='ffmpeg_frames_')
@@ -94,18 +94,20 @@ def extract_frames_ffmpeg(aviPath, frames, fps=30):
     
     # Extract frames using FFmpeg's select filter for batch extraction
     # This is MUCH faster than extracting individual frames
-    print(f'Extracting {len(frames)} frames using FFmpeg...')
+    # FFmpeg emits each selected frame once, in video order.
+    valid_frames = np.unique(np.array(frames, dtype=int))
+    requested_frame_count = valid_frames.shape[0]
+    print(f'Extracting {requested_frame_count} frames using FFmpeg...')
     
     # Limit frames to video length if we know it
-    valid_frames = np.array(frames, dtype=int)
     if total_frames is not None:
         valid_frames = valid_frames[valid_frames < total_frames]
         if valid_frames.shape[0] == 0:
             print('No valid frames within video length. Skipping FFmpeg extraction.')
             shutil.rmtree(temp_dir, ignore_errors=True)
             return None, None, None
-        if valid_frames.shape[0] < len(frames):
-            print(f'Warning: {len(frames) - valid_frames.shape[0]} frames exceed video length and will be skipped.')
+        if valid_frames.shape[0] < requested_frame_count:
+            print(f'Warning: {requested_frame_count - valid_frames.shape[0]} frames exceed video length and will be skipped.')
 
     # Build select expression for FFmpeg (e.g., "eq(n\,100)+eq(n\,200)+eq(n\,300)")
     select_expr = '+'.join([f'eq(n\\,{int(f)})' for f in valid_frames])
@@ -152,93 +154,96 @@ def getAnimalLength(aviPath,frames,coordinates,boxSize=200,threshold=20,invert=F
     
     eAll = np.zeros((frames.shape[0], coordinates.shape[1], 6))
     temp_dir = None
-    frame_images = []
-    
-    # Try FFmpeg extraction first if requested
-    if use_ffmpeg:
-        temp_dir, frame_files, valid_frames = extract_frames_ffmpeg(aviPath, frames)
+    cap = None
 
-        if frame_files is not None and len(frame_files) > 0:
-            print('Using FFmpeg for frame extraction')
-            # Map extracted frames to their frame numbers
-            frame_map = {}
-            for frame_num, frame_file in zip(valid_frames, frame_files):
-                img = cv2.imread(frame_file, cv2.IMREAD_GRAYSCALE)
-                if img is None:
-                    img = cv2.imread(frame_file)
-                    if img is not None:
-                        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                frame_map[int(frame_num)] = img
-        else:
-            print('FFmpeg extraction failed, falling back to OpenCV')
-            use_ffmpeg = False
-    
-    # Fallback to OpenCV if FFmpeg disabled or failed
-    if not use_ffmpeg or len(frame_images) == 0:
-        print('Using OpenCV for frame extraction')
-        cap = cv2.VideoCapture(aviPath)
-    
-    # Process frames
-    for i in range(frames.shape[0]):
-        string = str(i) + ' out of ' + str(frames.shape[0]) + ' frames.'
-        sys.stdout.write('\r' + string)
-        
-        # Get frame image
-        if use_ffmpeg and frame_files is not None:
-            gray = frame_map.get(int(frames[i]))
-        else:
-            f = frames[i]
-            cap.set(cv2.CAP_PROP_POS_FRAMES, f)
-            ret, image = cap.read()
-            if not ret or image is None:
-                gray = None
-            else:
-                try:
-                    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                except:
-                    gray = image
+    try:
+        # Try FFmpeg extraction first if requested
+        if use_ffmpeg:
+            temp_dir, frame_files, valid_frames = extract_frames_ffmpeg(aviPath, frames)
 
-        if gray is None:
-            eAll[i, :, :] = np.nan
-            continue
-        
-        # Process each animal in the frame
-        for j in range(coordinates.shape[1]):
-            g = gray.copy()
-            if np.isnan(coordinates[i, j, 0]):
-                eAll[i, j, :] = np.nan
+            if (frame_files is not None and len(frame_files) > 0
+                    and valid_frames is not None and len(frame_files) == len(valid_frames)):
+                print('Using FFmpeg for frame extraction')
+                # Map unique extracted images back to the original request rows below.
+                frame_map = {}
+                for frame_num, frame_file in zip(valid_frames, frame_files):
+                    img = cv2.imread(frame_file, cv2.IMREAD_GRAYSCALE)
+                    if img is None:
+                        img = cv2.imread(frame_file)
+                        if img is not None:
+                            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    frame_map[int(frame_num)] = img
             else:
-                currCenter = geometry.Vector(*coordinates[i, j, :].astype('int'))
-                crop = ImageProcessor.crop_zero_pad(g, currCenter, boxSize)
-                
-                if invert:
-                    crop = 255 - crop
-                img_binary = ImageProcessor.to_binary(crop.copy(), threshold, invertMe=False)
-                
-                contours, hierarchy = cv2.findContours(img_binary.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                img_center = geometry.Vector(crop.shape[0] / 2, crop.shape[1] / 2)
-                
-                cnt = ImageProcessor.get_contour_containing_point(contours, img_center)
-                try:
-                    (x, y), (MA, ma), ori = cv2.minAreaRect(cnt[0])
-                    eAll[i, j, 0:5] = [x, y, MA, ma, ori]
-                    eAll[i, j, 0:2] = eAll[i, j, 0:2] + currCenter
-                    mask = crop.copy() * 0
-                    cv2.drawContours(mask, cnt[0], -1, (255), -1)
-                    eAll[i, j, 5] = cv2.mean(crop, mask=mask)[0]
-                except:
+                print('FFmpeg extraction failed or incomplete, falling back to OpenCV')
+                if temp_dir is not None:
+                    shutil.rmtree(temp_dir)
+                    temp_dir = None
+                use_ffmpeg = False
+
+        # Fallback to OpenCV if FFmpeg disabled or failed
+        if not use_ffmpeg:
+            print('Using OpenCV for frame extraction')
+            cap = cv2.VideoCapture(aviPath)
+
+        # Process frames in the original order, keeping their coordinate rows aligned.
+        for i in range(frames.shape[0]):
+            string = str(i) + ' out of ' + str(frames.shape[0]) + ' frames.'
+            sys.stdout.write('\r' + string)
+
+            # Get frame image
+            if use_ffmpeg:
+                gray = frame_map.get(int(frames[i]))
+            else:
+                f = frames[i]
+                cap.set(cv2.CAP_PROP_POS_FRAMES, f)
+                ret, image = cap.read()
+                if not ret or image is None:
+                    gray = None
+                else:
+                    try:
+                        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                    except:
+                        gray = image
+
+            if gray is None:
+                eAll[i, :, :] = np.nan
+                continue
+
+            # Process each animal in the frame
+            for j in range(coordinates.shape[1]):
+                g = gray.copy()
+                if np.isnan(coordinates[i, j, 0]):
                     eAll[i, j, :] = np.nan
-    
-    # Cleanup
-    if temp_dir is not None:
-        try:
-            shutil.rmtree(temp_dir)
-            print(f'\nCleaned up temporary frames from {temp_dir}')
-        except:
-            print(f'\nWarning: Could not clean up {temp_dir}')
-    
-    if not use_ffmpeg or len(frame_images) == 0:
-        cap.release()
+                else:
+                    currCenter = geometry.Vector(*coordinates[i, j, :].astype('int'))
+                    crop = ImageProcessor.crop_zero_pad(g, currCenter, boxSize)
+
+                    if invert:
+                        crop = 255 - crop
+                    img_binary = ImageProcessor.to_binary(crop.copy(), threshold, invertMe=False)
+
+                    contours, hierarchy = cv2.findContours(img_binary.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                    img_center = geometry.Vector(crop.shape[0] / 2, crop.shape[1] / 2)
+
+                    cnt = ImageProcessor.get_contour_containing_point(contours, img_center)
+                    try:
+                        (x, y), (MA, ma), ori = cv2.minAreaRect(cnt[0])
+                        eAll[i, j, 0:5] = [x, y, MA, ma, ori]
+                        eAll[i, j, 0:2] = eAll[i, j, 0:2] + currCenter
+                        mask = crop.copy() * 0
+                        cv2.drawContours(mask, cnt[0], -1, (255), -1)
+                        eAll[i, j, 5] = cv2.mean(crop, mask=mask)[0]
+                    except:
+                        eAll[i, j, :] = np.nan
+    finally:
+        if cap is not None:
+            cap.release()
+        if temp_dir is not None:
+            try:
+                shutil.rmtree(temp_dir)
+                print(f'\nCleaned up temporary frames from {temp_dir}')
+            except:
+                print(f'\nWarning: Could not clean up {temp_dir}')
     
     return eAll      
 

@@ -31,8 +31,7 @@ def getAnimalSizeFromVideo(currAvi,rawData,camHeight, sizePercentile=40,numPairs
         
         #for virtual pairing, can use random frames, no need to avoid collisions
         traAll=np.zeros((numFrames,numPairs,2))
-        #frames=np.random.randint(1000,20000,numFrames)
-        frames=np.sort(np.random.randint(1000,20000,numFrames))  # Sort frames for sequential reading
+        frames=np.sort(np.random.choice(np.arange(1000,20000),numFrames,replace=False))
         print('using random frames, decorrected position to determine size. correction: ',xMax,yMax,camHeight)
         for i in range(numPairs):
             currCols=[i*3,i*3+1]
